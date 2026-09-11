@@ -1,0 +1,167 @@
+name: Create Branch from Issue
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: read
+
+jobs:
+  create-branch:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Parse issue title
+        id: parse
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+
+          type=$(printf '%s' "$ISSUE_TITLE" \
+            | grep -oP '(?<=\[)[^]]+(?=\])' \
+            | head -1 \
+            | tr '[:upper:]' '[:lower:]' || true)
+
+          case "$type" in
+            feat) prefix="feature" ;;
+            fix|refactor|chore|docs|test|ci|perf|infra) prefix="$type" ;;
+            *)
+              echo "지원하는 Issue type을 찾지 못해 브랜치를 생성하지 않습니다."
+              echo "should_create=false" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
+
+          echo "should_create=true" >> "$GITHUB_OUTPUT"
+          echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
+          echo "issue_number=$ISSUE_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Check existing branch
+        if: steps.parse.outputs.should_create == 'true'
+        id: branch-check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ steps.parse.outputs.issue_number }}
+        run: |
+          set -euo pipefail
+
+          existing_branch=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/branches" \
+            --paginate \
+            --jq '.[].name' \
+            | grep -F "/#${ISSUE_NUMBER}-" \
+            | head -1 || true)
+
+          if [ -n "$existing_branch" ]; then
+            echo "Issue #${ISSUE_NUMBER}의 브랜치가 이미 존재합니다: ${existing_branch}"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate branch slug via Groq
+        if: >-
+          steps.parse.outputs.should_create == 'true' &&
+          steps.branch-check.outputs.exists == 'false'
+        id: slug
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$GROQ_API_KEY" ]; then
+            echo "GROQ_API_KEY Repository Secret이 설정되지 않았습니다."
+            exit 1
+          fi
+
+          body=$(jq -n \
+            --arg title "$ISSUE_TITLE" \
+            '{
+              "model": "openai/gpt-oss-20b",
+              "messages": [
+                {
+                  "role": "user",
+                  "content": ("Convert the following GitHub issue title into a concise English git branch slug.\n\nRules:\n- Translate Korean text into English.\n- Use lowercase ASCII letters, numbers, and hyphens only.\n- Use at most 5 words.\n- Ignore emoji and bracketed issue types such as FEAT, FIX, REFACTOR, CHORE, DOCS, TEST, CI, PERF, and INFRA.\n- Return only the value required by the JSON schema.\n\nIssue title:\n" + $title)
+                }
+              ],
+              "temperature": 0,
+              "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                  "name": "branch_slug",
+                  "strict": true,
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+){0,4}$"
+                      }
+                    },
+                    "required": ["slug"],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }')
+
+          http_response=$(curl \
+            --silent \
+            --show-error \
+            --write-out "\n%{http_code}" \
+            https://api.groq.com/openai/v1/chat/completions \
+            -H "Authorization: Bearer $GROQ_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$body")
+
+          http_status=$(printf '%s\n' "$http_response" | tail -n1)
+          response=$(printf '%s\n' "$http_response" | sed '$d')
+
+          if [ "$http_status" -lt 200 ] || [ "$http_status" -ge 300 ]; then
+            echo "Groq API 요청이 실패했습니다. HTTP status: $http_status"
+            printf '%s\n' "$response" | jq '.' 2>/dev/null || printf '%s\n' "$response"
+            exit 1
+          fi
+
+          content=$(printf '%s' "$response" \
+            | jq -r '.choices[0].message.content // empty')
+          slug=$(printf '%s' "$content" | jq -r '.slug // empty')
+
+          if ! printf '%s' "$slug" \
+            | grep -Eq '^[a-z0-9]+(-[a-z0-9]+){0,4}$'; then
+            echo "Groq API가 브랜치 규칙에 맞지 않는 slug를 반환했습니다: ${slug}"
+            exit 1
+          fi
+
+          echo "slug=$slug" >> "$GITHUB_OUTPUT"
+
+      - name: Create branch
+        if: >-
+          steps.parse.outputs.should_create == 'true' &&
+          steps.branch-check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PREFIX: ${{ steps.parse.outputs.prefix }}
+          ISSUE_NUMBER: ${{ steps.parse.outputs.issue_number }}
+          SLUG: ${{ steps.slug.outputs.slug }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+
+          branch_name="${PREFIX}/#${ISSUE_NUMBER}-${SLUG}"
+          base_sha=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/git/ref/heads/${BASE_BRANCH}" \
+            --jq '.object.sha')
+
+          gh api \
+            "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -X POST \
+            -f ref="refs/heads/${branch_name}" \
+            -f sha="$base_sha"
+
+          echo "${BASE_BRANCH}에서 '${branch_name}' 브랜치를 생성했습니다."
