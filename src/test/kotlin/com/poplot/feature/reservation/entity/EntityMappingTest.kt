@@ -5,21 +5,27 @@ import com.poplot.feature.auth.entity.SocialAccount
 import com.poplot.feature.event.entity.Event
 import com.poplot.feature.store.entity.Store
 import com.poplot.feature.user.entity.User
+import com.poplot.global.config.JpaAuditingConfig
 import jakarta.persistence.EntityManager
 import jakarta.persistence.FetchType
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.OneToOne
+import jakarta.persistence.PersistenceException
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
+import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.util.UUID
 
 @DataJpaTest
 @ActiveProfiles("test")
+@Import(JpaAuditingConfig::class)
 class EntityMappingTest @Autowired constructor(private val entityManager: EntityManager) {
     @Test
     fun `all core entities persist with their associations`() {
@@ -44,9 +50,21 @@ class EntityMappingTest @Autowired constructor(private val entityManager: Entity
         entityManager.persist(AuthSession(user, "refresh-hash", Instant.now().plusSeconds(3600)))
         entityManager.flush()
 
+        assertThat(user.publicId).isNotNull()
         assertThat(reservation.id).isNotNull()
         assertThat(slot.remainingCount).isEqualTo(10)
         assertThat(slot.isSoldOut).isFalse()
+    }
+
+    @Test
+    fun `user public id is unique`() {
+        val publicId = UUID.randomUUID()
+        entityManager.persist(User(email = "first@example.com", publicId = publicId))
+
+        assertThatThrownBy {
+            entityManager.persist(User(email = "second@example.com", publicId = publicId))
+            entityManager.flush()
+        }.isInstanceOf(PersistenceException::class.java)
     }
 
     @Test
