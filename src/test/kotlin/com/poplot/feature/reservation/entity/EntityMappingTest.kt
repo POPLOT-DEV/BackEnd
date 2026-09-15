@@ -2,6 +2,7 @@ package com.poplot.feature.reservation.entity
 
 import com.poplot.feature.auth.entity.AuthSession
 import com.poplot.feature.auth.entity.SocialAccount
+import com.poplot.feature.auth.enums.SocialProvider
 import com.poplot.feature.event.entity.Event
 import com.poplot.feature.store.entity.Store
 import com.poplot.feature.user.entity.User
@@ -46,7 +47,7 @@ class EntityMappingTest @Autowired constructor(private val entityManager: Entity
         entityManager.persist(reservation)
         entityManager.persist(Waitlist(user, slot, 2))
         entityManager.persist(QrTicket(reservation, "ticket-hash", Instant.now()))
-        entityManager.persist(SocialAccount(user, "KAKAO", "provider-id"))
+        entityManager.persist(SocialAccount(user, SocialProvider.KAKAO, "provider-id"))
         entityManager.persist(AuthSession(user, "refresh-hash", Instant.now().plusSeconds(3600)))
         entityManager.flush()
 

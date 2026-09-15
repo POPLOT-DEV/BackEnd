@@ -1,5 +1,6 @@
 package com.poplot.feature.auth.entity
 
+import com.poplot.feature.auth.enums.SocialProvider
 import com.poplot.feature.user.entity.User
 import com.poplot.global.common.entity.BaseTimeEntity
 import jakarta.persistence.*
@@ -19,8 +20,9 @@ class SocialAccount(
     @JoinColumn(name = "user_id", nullable = false)
     val user: User,
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
-    val provider: String,
+    val provider: SocialProvider,
 
     @Column(name = "provider_user_id", nullable = false, length = 255)
     val providerUserId: String,
