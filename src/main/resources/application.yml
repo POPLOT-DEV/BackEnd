@@ -21,6 +21,14 @@ oauth:
     base-url: ${KAKAO_API_BASE_URL:https://kapi.kakao.com}
     connect-timeout: ${KAKAO_API_CONNECT_TIMEOUT:2s}
     read-timeout: ${KAKAO_API_READ_TIMEOUT:3s}
+  apple:
+    base-url: ${APPLE_API_BASE_URL:https://appleid.apple.com}
+    client-id: ${APPLE_CLIENT_ID}
+    issuer: https://appleid.apple.com
+    connect-timeout: ${APPLE_API_CONNECT_TIMEOUT:2s}
+    read-timeout: ${APPLE_API_READ_TIMEOUT:3s}
+    public-key-cache-ttl: ${APPLE_PUBLIC_KEY_CACHE_TTL:1h}
+    clock-skew-seconds: ${APPLE_CLOCK_SKEW_SECONDS:30}
 
 logging:
   pattern:
