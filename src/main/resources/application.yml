@@ -16,6 +16,12 @@ jwt:
   access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION}
   refresh-token-expiration: ${JWT_REFRESH_TOKEN_EXPIRATION}
 
+oauth:
+  kakao:
+    base-url: ${KAKAO_API_BASE_URL:https://kapi.kakao.com}
+    connect-timeout: ${KAKAO_API_CONNECT_TIMEOUT:2s}
+    read-timeout: ${KAKAO_API_READ_TIMEOUT:3s}
+
 logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{traceId:-NO_TRACE}] [%thread] %logger{36} - %msg%n"
