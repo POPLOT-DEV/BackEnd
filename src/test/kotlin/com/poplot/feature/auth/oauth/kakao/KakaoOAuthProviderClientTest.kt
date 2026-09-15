@@ -27,11 +27,12 @@ class KakaoOAuthProviderClientTest {
     fun setUp() {
         val builder = RestClient.builder().baseUrl(BASE_URL)
         server = MockRestServiceServer.bindTo(builder).build()
-        client = KakaoOAuthProviderClient(builder.build())
+        client = KakaoOAuthProviderClient(builder.build(), APP_ID)
     }
 
     @Test
     fun `valid token returns verified kakao user info`() {
+        expectTokenInfo()
         server.expect(requestTo("$BASE_URL/v2/user/me"))
             .andExpect(method(HttpMethod.GET))
             .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer provider-token"))
@@ -52,6 +53,7 @@ class KakaoOAuthProviderClientTest {
 
     @Test
     fun `unverified email is not used`() {
+        expectTokenInfo()
         server.expect(requestTo("$BASE_URL/v2/user/me"))
             .andRespond(
                 withSuccess(
@@ -65,7 +67,7 @@ class KakaoOAuthProviderClientTest {
 
     @Test
     fun `expired token response is mapped to expired auth error`() {
-        server.expect(requestTo("$BASE_URL/v2/user/me"))
+        server.expect(requestTo("$BASE_URL/v1/user/access_token_info"))
             .andRespond(withUnauthorizedRequest().body("""{"code":-401,"msg":"access token expired"}"""))
 
         assertAuthError(AuthErrorCode.OAUTH_TOKEN_EXPIRED) {
@@ -75,7 +77,7 @@ class KakaoOAuthProviderClientTest {
 
     @Test
     fun `invalid token response is mapped to authentication failure`() {
-        server.expect(requestTo("$BASE_URL/v2/user/me"))
+        server.expect(requestTo("$BASE_URL/v1/user/access_token_info"))
             .andRespond(withUnauthorizedRequest().body("""{"code":-401,"msg":"this access token does not exist"}"""))
 
         assertAuthError(AuthErrorCode.OAUTH_AUTHENTICATION_FAILED) {
@@ -85,6 +87,7 @@ class KakaoOAuthProviderClientTest {
 
     @Test
     fun `provider server failure is mapped to unavailable error`() {
+        expectTokenInfo()
         server.expect(requestTo("$BASE_URL/v2/user/me"))
             .andRespond(withServerError())
 
@@ -95,6 +98,7 @@ class KakaoOAuthProviderClientTest {
 
     @Test
     fun `provider client error is mapped to authentication failure`() {
+        expectTokenInfo()
         server.expect(requestTo("$BASE_URL/v2/user/me"))
             .andRespond(withBadRequest())
 
@@ -111,6 +115,62 @@ class KakaoOAuthProviderClientTest {
         server.verify()
     }
 
+    @Test
+    fun `token issued for another kakao app is rejected`() {
+        expectTokenInfo(appId = 9999)
+
+        assertAuthError(AuthErrorCode.OAUTH_AUTHENTICATION_FAILED) {
+            client.authenticate("provider-token")
+        }
+        server.verify()
+    }
+
+    @Test
+    fun `token with no remaining lifetime is rejected as expired`() {
+        expectTokenInfo(expiresIn = 0)
+
+        assertAuthError(AuthErrorCode.OAUTH_TOKEN_EXPIRED) {
+            client.authenticate("provider-token")
+        }
+        server.verify()
+    }
+
+    @Test
+    fun `different user ids from token and user info are rejected`() {
+        expectTokenInfo(userId = 12345)
+        server.expect(requestTo("$BASE_URL/v2/user/me"))
+            .andRespond(withSuccess("""{"id":99999}""", MediaType.APPLICATION_JSON))
+
+        assertAuthError(AuthErrorCode.OAUTH_AUTHENTICATION_FAILED) {
+            client.authenticate("provider-token")
+        }
+    }
+
+    @Test
+    fun `kakao temporary error is mapped to unavailable error`() {
+        server.expect(requestTo("$BASE_URL/v1/user/access_token_info"))
+            .andRespond(withBadRequest().body("""{"code": -1,"msg":"Internal error"}"""))
+
+        assertAuthError(AuthErrorCode.OAUTH_PROVIDER_UNAVAILABLE) {
+            client.authenticate("provider-token")
+        }
+    }
+
+    private fun expectTokenInfo(
+        userId: Long = 12345,
+        appId: Long = APP_ID,
+        expiresIn: Long = 3600,
+    ) {
+        server.expect(requestTo("$BASE_URL/v1/user/access_token_info"))
+            .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer provider-token"))
+            .andRespond(
+                withSuccess(
+                    """{"id":$userId,"expires_in":$expiresIn,"app_id":$appId}""",
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+    }
+
     private fun assertAuthError(
         expected: AuthErrorCode,
         action: () -> Unit,
@@ -123,5 +183,6 @@ class KakaoOAuthProviderClientTest {
 
     private companion object {
         const val BASE_URL = "https://kapi.kakao.test"
+        const val APP_ID = 1234L
     }
 }

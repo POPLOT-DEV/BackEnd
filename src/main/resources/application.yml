@@ -19,6 +19,7 @@ jwt:
 oauth:
   kakao:
     base-url: ${KAKAO_API_BASE_URL:https://kapi.kakao.com}
+    app-id: ${KAKAO_APP_ID}
     connect-timeout: ${KAKAO_API_CONNECT_TIMEOUT:2s}
     read-timeout: ${KAKAO_API_READ_TIMEOUT:3s}
   apple:
