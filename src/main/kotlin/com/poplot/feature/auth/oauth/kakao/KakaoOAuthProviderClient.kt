@@ -8,6 +8,7 @@ import com.poplot.feature.auth.oauth.OAuthUserInfo
 import com.poplot.global.exception.GeneralException
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
 import org.springframework.web.client.HttpStatusCodeException
@@ -16,6 +17,7 @@ import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientException
 
 @Component
+@ConditionalOnProperty(prefix = "oauth.kakao", name = ["enabled"], havingValue = "true")
 class KakaoOAuthProviderClient(
     @Qualifier("kakaoRestClient") private val restClient: RestClient,
     @Value("\${oauth.kakao.app-id}") private val appId: Long,

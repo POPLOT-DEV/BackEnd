@@ -23,6 +23,7 @@ jwt:
 
 oauth:
   kakao:
+    enabled: true
     app-id: 1234
   apple:
     enabled: true
