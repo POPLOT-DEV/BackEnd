@@ -16,6 +16,9 @@ class OAuthBaseUrlValidatorTest {
         assertThatThrownBy {
             KakaoOAuthConfig().kakaoRestClient(HTTP_BASE_URL, TIMEOUT, TIMEOUT)
         }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy {
+            KakaoOAuthConfig().kakaoRestClient(HOSTLESS_HTTPS_BASE_URL, TIMEOUT, TIMEOUT)
+        }.isInstanceOf(IllegalArgumentException::class.java)
     }
 
     @Test
@@ -26,11 +29,15 @@ class OAuthBaseUrlValidatorTest {
         assertThatThrownBy {
             AppleOAuthConfig().appleRestClient(HTTP_BASE_URL, TIMEOUT, TIMEOUT)
         }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy {
+            AppleOAuthConfig().appleRestClient(HOSTLESS_HTTPS_BASE_URL, TIMEOUT, TIMEOUT)
+        }.isInstanceOf(IllegalArgumentException::class.java)
     }
 
     private companion object {
         const val HTTPS_BASE_URL = "https://oauth.provider.test"
         const val HTTP_BASE_URL = "http://oauth.provider.test"
+        const val HOSTLESS_HTTPS_BASE_URL = "https:/oauth.provider.test"
         val TIMEOUT: Duration = Duration.ofSeconds(1)
     }
 }
