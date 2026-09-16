@@ -57,6 +57,58 @@ class JwksApplePublicKeyProviderTest {
     }
 
     @Test
+    fun `unknown key ids trigger at most one forced refresh per cache generation`() {
+        val key = generatePublicKey()
+        server.expect(requestTo("$BASE_URL/auth/keys"))
+            .andRespond(withSuccess(jwkSet(key), MediaType.APPLICATION_JSON))
+        server.expect(requestTo("$BASE_URL/auth/keys"))
+            .andRespond(withSuccess(jwkSet(key), MediaType.APPLICATION_JSON))
+        provider.getPublicKey(KEY_ID)
+
+        assertAuthError(AuthErrorCode.OAUTH_AUTHENTICATION_FAILED) {
+            provider.getPublicKey("unknown-key-id-1")
+        }
+        assertAuthError(AuthErrorCode.OAUTH_AUTHENTICATION_FAILED) {
+            provider.getPublicKey("unknown-key-id-2")
+        }
+        server.verify()
+    }
+
+    @Test
+    fun `unknown key id can resolve an apple signing key after one forced refresh`() {
+        val oldKey = generatePublicKey()
+        val rotatedKey = generatePublicKey()
+        server.expect(requestTo("$BASE_URL/auth/keys"))
+            .andRespond(withSuccess(jwkSet(oldKey), MediaType.APPLICATION_JSON))
+        server.expect(requestTo("$BASE_URL/auth/keys"))
+            .andRespond(withSuccess(jwkSet(rotatedKey, ROTATED_KEY_ID), MediaType.APPLICATION_JSON))
+        provider.getPublicKey(KEY_ID)
+
+        val resolved = provider.getPublicKey(ROTATED_KEY_ID) as RSAPublicKey
+
+        assertThat(resolved.modulus).isEqualTo(rotatedKey.modulus)
+        server.verify()
+    }
+
+    @Test
+    fun `failed forced refresh is not repeated for other unknown key ids`() {
+        val key = generatePublicKey()
+        server.expect(requestTo("$BASE_URL/auth/keys"))
+            .andRespond(withSuccess(jwkSet(key), MediaType.APPLICATION_JSON))
+        server.expect(requestTo("$BASE_URL/auth/keys"))
+            .andRespond(withServerError())
+        provider.getPublicKey(KEY_ID)
+
+        assertAuthError(AuthErrorCode.OAUTH_PROVIDER_UNAVAILABLE) {
+            provider.getPublicKey("unknown-key-id-1")
+        }
+        assertAuthError(AuthErrorCode.OAUTH_AUTHENTICATION_FAILED) {
+            provider.getPublicKey("unknown-key-id-2")
+        }
+        server.verify()
+    }
+
+    @Test
     fun `apple public key server failure is mapped to unavailable error`() {
         server.expect(requestTo("$BASE_URL/auth/keys"))
             .andRespond(withServerError())
@@ -66,8 +118,15 @@ class JwksApplePublicKeyProviderTest {
         }
     }
 
-    private fun jwkSet(key: RSAPublicKey): String =
-        """{"keys":[{"kty":"RSA","kid":"$KEY_ID","use":"sig","alg":"RS256","n":"${encode(key.modulus.toByteArray())}","e":"${encode(key.publicExponent.toByteArray())}"}]}"""
+    private fun jwkSet(
+        key: RSAPublicKey,
+        keyId: String = KEY_ID,
+    ): String =
+        """{"keys":[{"kty":"RSA","kid":"$keyId","use":"sig","alg":"RS256","n":"${encode(key.modulus.toByteArray())}","e":"${encode(key.publicExponent.toByteArray())}"}]}"""
+
+    private fun generatePublicKey(): RSAPublicKey =
+        KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }
+            .generateKeyPair().public as RSAPublicKey
 
     private fun encode(bytes: ByteArray): String {
         val unsigned = if (bytes.first() == 0.toByte()) bytes.copyOfRange(1, bytes.size) else bytes
@@ -84,5 +143,6 @@ class JwksApplePublicKeyProviderTest {
     private companion object {
         const val BASE_URL = "https://appleid.apple.test"
         const val KEY_ID = "apple-key-id"
+        const val ROTATED_KEY_ID = "rotated-apple-key-id"
     }
 }

@@ -41,17 +41,30 @@ class JwksApplePublicKeyProvider(
         val snapshot = cache
         if (Instant.now().isBefore(snapshot.expiresAt)) {
             snapshot.keys[keyId]?.let { return it }
+            if (snapshot.unknownKeyRefreshAttempted) {
+                throw GeneralException(AuthErrorCode.OAUTH_AUTHENTICATION_FAILED)
+            }
         }
 
         return synchronized(this) {
             val current = cache
-            if (Instant.now().isBefore(current.expiresAt)) {
+            val currentIsValid = Instant.now().isBefore(current.expiresAt)
+            if (currentIsValid) {
                 current.keys[keyId]?.let { return@synchronized it }
+                if (current.unknownKeyRefreshAttempted) {
+                    throw GeneralException(AuthErrorCode.OAUTH_AUTHENTICATION_FAILED)
+                }
+                cache = current.copy(unknownKeyRefreshAttempted = true)
             }
 
             val refreshed = fetchPublicKeys()
-            cache = PublicKeyCache(refreshed, Instant.now().plus(cacheTtl))
-            refreshed[keyId] ?: throw GeneralException(AuthErrorCode.OAUTH_AUTHENTICATION_FAILED)
+            val publicKey = refreshed[keyId]
+            cache = PublicKeyCache(
+                keys = refreshed,
+                expiresAt = Instant.now().plus(cacheTtl),
+                unknownKeyRefreshAttempted = currentIsValid || publicKey == null,
+            )
+            publicKey ?: throw GeneralException(AuthErrorCode.OAUTH_AUTHENTICATION_FAILED)
         }
     }
 
@@ -101,6 +114,7 @@ class JwksApplePublicKeyProvider(
     private data class PublicKeyCache(
         val keys: Map<String, PublicKey>,
         val expiresAt: Instant,
+        val unknownKeyRefreshAttempted: Boolean = false,
     )
 
     private companion object {
