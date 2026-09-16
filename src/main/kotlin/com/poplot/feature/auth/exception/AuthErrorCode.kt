@@ -28,6 +28,11 @@ enum class AuthErrorCode(
         "AUTH_401_08",
         "만료된 OAuth 인증 토큰입니다.",
     ),
+    INACTIVE_USER(
+        HttpStatus.FORBIDDEN,
+        "AUTH_403_01",
+        "비활성화된 사용자입니다.",
+    ),
     OAUTH_PROVIDER_UNAVAILABLE(
         HttpStatus.SERVICE_UNAVAILABLE,
         "AUTH_503_01",
