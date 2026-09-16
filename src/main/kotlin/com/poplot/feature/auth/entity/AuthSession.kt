@@ -42,4 +42,9 @@ class AuthSession(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "auth_session_id")
     val id: Long? = null,
-) : BaseCreatedTimeEntity()
+) : BaseCreatedTimeEntity() {
+    fun revoke(usedAt: Instant) {
+        lastUsedAt = usedAt
+        revokedAt = usedAt
+    }
+}

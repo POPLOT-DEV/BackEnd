@@ -4,6 +4,7 @@ import com.poplot.feature.auth.exception.AuthErrorCode
 import com.poplot.feature.auth.service.IssuedAuthTokens
 import com.poplot.feature.auth.service.OAuthLoginResult
 import com.poplot.feature.auth.service.OAuthLoginService
+import com.poplot.feature.auth.service.RefreshTokenService
 import com.poplot.feature.user.entity.User
 import com.poplot.global.exception.GeneralException
 import org.junit.jupiter.api.Test
@@ -25,6 +26,9 @@ class AuthControllerTest @Autowired constructor(
 ) {
     @MockitoBean
     private lateinit var oauthLoginService: OAuthLoginService
+
+    @MockitoBean
+    private lateinit var refreshTokenService: RefreshTokenService
 
     @Test
     fun `인증 없이 OAuth 로그인 API를 호출할 수 있다`() {
@@ -66,6 +70,40 @@ class AuthControllerTest @Autowired constructor(
             jsonPath("$.isSuccess") { value(false) }
             jsonPath("$.code") { value("AUTH_400_03") }
             jsonPath("$.data") { doesNotExist() }
+        }
+    }
+
+    @Test
+    fun `인증 없이 Refresh Token을 재발급할 수 있다`() {
+        `when`(refreshTokenService.refresh("old-refresh-token")).thenReturn(
+            IssuedAuthTokens("new-access-token", "new-refresh-token", 3600),
+        )
+
+        mockMvc.post("/auth/refresh") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"refreshToken":"old-refresh-token"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.isSuccess") { value(true) }
+            jsonPath("$.code") { value("OK") }
+            jsonPath("$.data.accessToken") { value("new-access-token") }
+            jsonPath("$.data.refreshToken") { value("new-refresh-token") }
+            jsonPath("$.data.expiresIn") { value(3600) }
+        }
+    }
+
+    @Test
+    fun `Refresh Token이 없으면 명세 오류를 반환한다`() {
+        `when`(refreshTokenService.refresh(null))
+            .thenThrow(GeneralException(AuthErrorCode.REFRESH_TOKEN_REQUIRED))
+
+        mockMvc.post("/auth/refresh") {
+            contentType = MediaType.APPLICATION_JSON
+            content = "{}"
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.isSuccess") { value(false) }
+            jsonPath("$.code") { value("AUTH_400_01") }
         }
     }
 }

@@ -8,6 +8,11 @@ enum class AuthErrorCode(
     override val code: String,
     override val message: String,
 ) : BaseErrorCode {
+    REFRESH_TOKEN_REQUIRED(
+        HttpStatus.BAD_REQUEST,
+        "AUTH_400_01",
+        "Refresh Token이 필요합니다.",
+    ),
     UNSUPPORTED_OAUTH_PROVIDER(
         HttpStatus.BAD_REQUEST,
         "AUTH_400_02",
@@ -17,6 +22,21 @@ enum class AuthErrorCode(
         HttpStatus.BAD_REQUEST,
         "AUTH_400_03",
         "OAuth 인증 토큰이 필요합니다.",
+    ),
+    INVALID_REFRESH_TOKEN(
+        HttpStatus.UNAUTHORIZED,
+        "AUTH_401_01",
+        "유효하지 않은 Refresh Token입니다.",
+    ),
+    EXPIRED_REFRESH_TOKEN(
+        HttpStatus.UNAUTHORIZED,
+        "AUTH_401_02",
+        "만료된 Refresh Token입니다.",
+    ),
+    UNUSABLE_REFRESH_TOKEN(
+        HttpStatus.UNAUTHORIZED,
+        "AUTH_401_03",
+        "사용할 수 없는 Refresh Token입니다.",
     ),
     OAUTH_AUTHENTICATION_FAILED(
         HttpStatus.UNAUTHORIZED,

@@ -41,6 +41,7 @@ class SecurityConfig(
             "/v3/api-docs/**",
             "/actuator/health",
             "/auth/oauth/**",
+            "/auth/refresh",
             "/api/v1/examples/**",
         )
     }
