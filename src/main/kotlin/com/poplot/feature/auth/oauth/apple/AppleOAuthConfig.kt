@@ -1,5 +1,6 @@
 package com.poplot.feature.auth.oauth.apple
 
+import com.poplot.feature.auth.oauth.requireHttpsBaseUrl
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Bean
@@ -22,7 +23,7 @@ class AppleOAuthConfig {
             setReadTimeout(readTimeout)
         }
         return RestClient.builder()
-            .baseUrl(baseUrl)
+            .baseUrl(requireHttpsBaseUrl(baseUrl))
             .requestFactory(requestFactory)
             .build()
     }
