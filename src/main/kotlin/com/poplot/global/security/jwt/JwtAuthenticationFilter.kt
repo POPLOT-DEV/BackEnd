@@ -26,12 +26,19 @@ class JwtAuthenticationFilter(
 
     private fun resolveToken(request: HttpServletRequest): String? {
         val authorizationHeader = request.getHeader(AUTHORIZATION_HEADER) ?: return null
-        if (!authorizationHeader.startsWith(BEARER_PREFIX)) {
+        if (!authorizationHeader.regionMatches(
+                thisOffset = 0,
+                other = BEARER_PREFIX,
+                otherOffset = 0,
+                length = BEARER_PREFIX.length,
+                ignoreCase = true,
+            )
+        ) {
             request.setAttribute(JWT_AUTH_ERROR_ATTRIBUTE, AuthErrorCode.INVALID_ACCESS_TOKEN)
             return null
         }
 
-        return authorizationHeader.removePrefix(BEARER_PREFIX).trim()
+        return authorizationHeader.substring(BEARER_PREFIX.length).trim()
             .ifBlank {
                 request.setAttribute(JWT_AUTH_ERROR_ATTRIBUTE, AuthErrorCode.INVALID_ACCESS_TOKEN)
                 null
