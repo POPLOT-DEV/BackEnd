@@ -38,6 +38,21 @@ enum class AuthErrorCode(
         "AUTH_401_03",
         "사용할 수 없는 Refresh Token입니다.",
     ),
+    AUTHENTICATION_REQUIRED(
+        HttpStatus.UNAUTHORIZED,
+        "AUTH_401_04",
+        "인증이 필요합니다.",
+    ),
+    INVALID_ACCESS_TOKEN(
+        HttpStatus.UNAUTHORIZED,
+        "AUTH_401_05",
+        "유효하지 않은 Access Token입니다.",
+    ),
+    EXPIRED_ACCESS_TOKEN(
+        HttpStatus.UNAUTHORIZED,
+        "AUTH_401_06",
+        "만료된 Access Token입니다.",
+    ),
     OAUTH_AUTHENTICATION_FAILED(
         HttpStatus.UNAUTHORIZED,
         "AUTH_401_07",
