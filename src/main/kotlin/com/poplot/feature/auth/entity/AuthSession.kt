@@ -4,6 +4,7 @@ import com.poplot.feature.user.entity.User
 import com.poplot.global.common.entity.BaseCreatedTimeEntity
 import jakarta.persistence.*
 import java.time.Instant
+import java.util.UUID
 
 @Entity
 @Table(
@@ -26,6 +27,9 @@ class AuthSession(
     @Column(name = "expires_at", nullable = false)
     val expiresAt: Instant,
 
+    @Column(name = "family_id", nullable = false, updatable = false)
+    val familyId: UUID,
+
     @Column(name = "device_id", length = 255)
     var deviceId: String? = null,
 
@@ -42,4 +46,9 @@ class AuthSession(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "auth_session_id")
     val id: Long? = null,
-) : BaseCreatedTimeEntity()
+) : BaseCreatedTimeEntity() {
+    fun revoke(usedAt: Instant) {
+        lastUsedAt = usedAt
+        revokedAt = usedAt
+    }
+}

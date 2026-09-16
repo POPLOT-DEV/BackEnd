@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component
 import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.util.Date
+import java.util.UUID
 import javax.crypto.SecretKey
 
 @Component
@@ -18,6 +19,11 @@ class JwtProvider(
     @Value("\${jwt.refresh-token-expiration}") private val refreshTokenExpiration: Long,
 ) {
     private val secretKey: SecretKey = Keys.hmacShaKeyFor(secret.toByteArray(StandardCharsets.UTF_8))
+
+    init {
+        require(accessTokenExpiration > 0) { "Access token expiration must be positive." }
+        require(refreshTokenExpiration > 0) { "Refresh token expiration must be positive." }
+    }
 
     fun createAccessToken(userId: Long): String =
         createToken(userId, ACCESS_TOKEN_TYPE, accessTokenExpiration)
@@ -33,6 +39,13 @@ class JwtProvider(
     fun isAccessToken(token: String): Boolean =
         parseClaims(token)[TOKEN_TYPE_CLAIM, String::class.java] == ACCESS_TOKEN_TYPE
 
+    fun isRefreshToken(token: String): Boolean =
+        parseClaims(token)[TOKEN_TYPE_CLAIM, String::class.java] == REFRESH_TOKEN_TYPE
+
+    fun getExpiration(token: String): Instant = parseClaims(token).expiration.toInstant()
+
+    fun getAccessTokenExpirationSeconds(): Long = accessTokenExpiration / MILLIS_PER_SECOND
+
     fun validateToken(token: String): Boolean =
         try {
             parseClaims(token)
@@ -46,6 +59,7 @@ class JwtProvider(
     private fun createToken(userId: Long, tokenType: String, expiration: Long): String {
         val now = Instant.now()
         return Jwts.builder()
+            .id(UUID.randomUUID().toString())
             .subject(userId.toString())
             .claim(TOKEN_TYPE_CLAIM, tokenType)
             .issuedAt(Date.from(now))
@@ -58,5 +72,6 @@ class JwtProvider(
         const val TOKEN_TYPE_CLAIM = "type"
         const val ACCESS_TOKEN_TYPE = "access"
         const val REFRESH_TOKEN_TYPE = "refresh"
+        const val MILLIS_PER_SECOND = 1_000L
     }
 }

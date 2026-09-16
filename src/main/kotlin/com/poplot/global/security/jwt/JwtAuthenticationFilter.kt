@@ -1,9 +1,11 @@
 package com.poplot.global.security.jwt
 
+import com.poplot.feature.auth.exception.AuthErrorCode
+import io.jsonwebtoken.ExpiredJwtException
+import io.jsonwebtoken.JwtException
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
-import org.slf4j.LoggerFactory
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
@@ -18,30 +20,54 @@ class JwtAuthenticationFilter(
         response: HttpServletResponse,
         filterChain: FilterChain,
     ) {
-        resolveToken(request)?.let(::authenticate)
+        resolveToken(request)?.let { authenticate(it, request) }
         filterChain.doFilter(request, response)
     }
 
     private fun resolveToken(request: HttpServletRequest): String? {
-        val authorizationHeader = request.getHeader(AUTHORIZATION_HEADER)
-            ?.takeIf { it.startsWith(BEARER_PREFIX) }
-            ?: return null
+        val authorizationHeader = request.getHeader(AUTHORIZATION_HEADER) ?: return null
+        if (!authorizationHeader.regionMatches(
+                thisOffset = 0,
+                other = BEARER_PREFIX,
+                otherOffset = 0,
+                length = BEARER_PREFIX.length,
+                ignoreCase = true,
+            )
+        ) {
+            request.setAttribute(JWT_AUTH_ERROR_ATTRIBUTE, AuthErrorCode.INVALID_ACCESS_TOKEN)
+            return null
+        }
 
-        return authorizationHeader.removePrefix(BEARER_PREFIX).trim().ifBlank { null }
+        return authorizationHeader.substring(BEARER_PREFIX.length).trim()
+            .ifBlank {
+                request.setAttribute(JWT_AUTH_ERROR_ATTRIBUTE, AuthErrorCode.INVALID_ACCESS_TOKEN)
+                null
+            }
     }
 
-    private fun authenticate(token: String) {
-        if (!jwtProvider.validateToken(token) || !jwtProvider.isAccessToken(token)) return
-
+    private fun authenticate(
+        token: String,
+        request: HttpServletRequest,
+    ) {
         try {
+            if (!jwtProvider.isAccessToken(token)) {
+                request.setAttribute(JWT_AUTH_ERROR_ATTRIBUTE, AuthErrorCode.INVALID_ACCESS_TOKEN)
+                return
+            }
             val authentication = UsernamePasswordAuthenticationToken(
                 jwtProvider.getUserId(token),
                 null,
                 emptyList(),
             )
             SecurityContextHolder.getContext().authentication = authentication
-        } catch (exception: RuntimeException) {
-            log.debug("JWT authentication failed", exception)
+        } catch (exception: ExpiredJwtException) {
+            request.setAttribute(JWT_AUTH_ERROR_ATTRIBUTE, AuthErrorCode.EXPIRED_ACCESS_TOKEN)
+            SecurityContextHolder.clearContext()
+        } catch (exception: JwtException) {
+            request.setAttribute(JWT_AUTH_ERROR_ATTRIBUTE, AuthErrorCode.INVALID_ACCESS_TOKEN)
+            SecurityContextHolder.clearContext()
+        } catch (exception: IllegalArgumentException) {
+            request.setAttribute(JWT_AUTH_ERROR_ATTRIBUTE, AuthErrorCode.INVALID_ACCESS_TOKEN)
             SecurityContextHolder.clearContext()
         }
     }
@@ -49,6 +75,5 @@ class JwtAuthenticationFilter(
     private companion object {
         const val AUTHORIZATION_HEADER = "Authorization"
         const val BEARER_PREFIX = "Bearer "
-        val log = LoggerFactory.getLogger(JwtAuthenticationFilter::class.java)
     }
 }

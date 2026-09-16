@@ -1,7 +1,7 @@
 package com.poplot.global.security.jwt
 
+import com.poplot.feature.auth.exception.AuthErrorCode
 import com.poplot.global.common.response.ApiResponse
-import com.poplot.global.exception.ErrorCode
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.http.MediaType
@@ -19,7 +19,8 @@ class JwtAuthenticationEntryPoint(
         response: HttpServletResponse,
         authException: AuthenticationException,
     ) {
-        val errorCode = ErrorCode.UNAUTHORIZED
+        val errorCode = request.getAttribute(JWT_AUTH_ERROR_ATTRIBUTE) as? AuthErrorCode
+            ?: AuthErrorCode.AUTHENTICATION_REQUIRED
         response.status = errorCode.httpStatus.value()
         response.contentType = MediaType.APPLICATION_JSON_VALUE
         response.characterEncoding = Charsets.UTF_8.name()

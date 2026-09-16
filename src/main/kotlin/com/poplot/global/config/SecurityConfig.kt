@@ -40,6 +40,8 @@ class SecurityConfig(
             "/swagger-ui.html",
             "/v3/api-docs/**",
             "/actuator/health",
+            "/auth/oauth/**",
+            "/auth/refresh",
             "/api/v1/examples/**",
         )
     }
