@@ -1,6 +1,8 @@
 package com.poplot.feature.auth.oauth
 
 import com.poplot.feature.auth.enums.SocialProvider
+import com.poplot.feature.auth.exception.AuthErrorCode
+import com.poplot.global.exception.GeneralException
 import org.springframework.stereotype.Component
 
 @Component
@@ -16,7 +18,6 @@ class OAuthProviderResolver(
     }
 
     fun resolve(provider: SocialProvider): OAuthProviderClient =
-        checkNotNull(clientsByProvider[provider]) {
-            "OAuth client is not configured for provider: $provider"
-        }
+        clientsByProvider[provider]
+            ?: throw GeneralException(AuthErrorCode.OAUTH_PROVIDER_UNAVAILABLE)
 }

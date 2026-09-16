@@ -1,6 +1,8 @@
 package com.poplot.feature.auth.oauth
 
 import com.poplot.feature.auth.enums.SocialProvider
+import com.poplot.feature.auth.exception.AuthErrorCode
+import com.poplot.global.exception.GeneralException
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -28,7 +30,9 @@ class OAuthProviderResolverTest {
         val resolver = OAuthProviderResolver(emptyList())
 
         assertThatThrownBy { resolver.resolve(SocialProvider.APPLE) }
-            .isInstanceOf(IllegalStateException::class.java)
+            .isInstanceOfSatisfying(GeneralException::class.java) {
+                assertThat(it.errorCode).isEqualTo(AuthErrorCode.OAUTH_PROVIDER_UNAVAILABLE)
+            }
     }
 
     private class StubOAuthProviderClient(
