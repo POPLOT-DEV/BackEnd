@@ -11,10 +11,12 @@ import io.jsonwebtoken.JwtException
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.LocatorAdapter
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 import java.security.Key
 
 @Component
+@ConditionalOnProperty(prefix = "oauth.apple", name = ["enabled"], havingValue = "true")
 class AppleOAuthProviderClient(
     private val publicKeyProvider: ApplePublicKeyProvider,
     @Value("\${oauth.apple.client-id}") private val clientId: String,

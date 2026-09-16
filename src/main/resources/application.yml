@@ -23,8 +23,9 @@ oauth:
     connect-timeout: ${KAKAO_API_CONNECT_TIMEOUT:2s}
     read-timeout: ${KAKAO_API_READ_TIMEOUT:3s}
   apple:
+    enabled: ${APPLE_OAUTH_ENABLED:false}
     base-url: ${APPLE_API_BASE_URL:https://appleid.apple.com}
-    client-id: ${APPLE_CLIENT_ID}
+    client-id: ${APPLE_CLIENT_ID:}
     issuer: https://appleid.apple.com
     connect-timeout: ${APPLE_API_CONNECT_TIMEOUT:2s}
     read-timeout: ${APPLE_API_READ_TIMEOUT:3s}

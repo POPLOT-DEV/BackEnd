@@ -25,4 +25,5 @@ oauth:
   kakao:
     app-id: 1234
   apple:
+    enabled: true
     client-id: com.poplot.test

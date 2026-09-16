@@ -5,6 +5,7 @@ import com.poplot.feature.auth.exception.AuthErrorCode
 import com.poplot.global.exception.GeneralException
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientException
@@ -22,6 +23,7 @@ fun interface ApplePublicKeyProvider {
 }
 
 @Component
+@ConditionalOnProperty(prefix = "oauth.apple", name = ["enabled"], havingValue = "true")
 class JwksApplePublicKeyProvider(
     @Qualifier("appleRestClient") private val restClient: RestClient,
     @Value("\${oauth.apple.public-key-cache-ttl}") private val cacheTtl: Duration,
