@@ -42,6 +42,7 @@ class AuthTokenServiceTest @Autowired constructor(
         assertThat(session.refreshTokenHash).doesNotContain(issued.refreshToken)
         assertThat(session.refreshTokenHash).hasSize(64)
         assertThat(session.expiresAt).isEqualTo(jwtProvider.getExpiration(issued.refreshToken))
+        assertThat(session.familyId).isNotNull()
         assertThat(session.revokedAt).isNull()
     }
 
@@ -53,6 +54,8 @@ class AuthTokenServiceTest @Autowired constructor(
         val second = authTokenService.issue(user)
 
         assertThat(second.refreshToken).isNotEqualTo(first.refreshToken)
-        assertThat(authSessionRepository.count()).isEqualTo(2)
+        val sessions = authSessionRepository.findAll()
+        assertThat(sessions).hasSize(2)
+        assertThat(sessions.map { it.familyId }).doesNotHaveDuplicates()
     }
 }

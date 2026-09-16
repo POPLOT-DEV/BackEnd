@@ -15,6 +15,8 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
+import org.springframework.transaction.annotation.Propagation
+import org.springframework.transaction.annotation.Transactional
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -28,6 +30,7 @@ import org.springframework.test.context.ActiveProfiles
 class RefreshTokenServiceTest @Autowired constructor(
     private val refreshTokenService: RefreshTokenService,
     private val authTokenService: AuthTokenService,
+    private val refreshTokenHasher: RefreshTokenHasher,
     private val jwtProvider: JwtProvider,
     private val userRepository: UserRepository,
     private val authSessionRepository: AuthSessionRepository,
@@ -48,16 +51,44 @@ class RefreshTokenServiceTest @Autowired constructor(
         assertThat(sessions.first().revokedAt).isNotNull()
         assertThat(sessions.first().lastUsedAt).isEqualTo(sessions.first().revokedAt)
         assertThat(sessions.last().revokedAt).isNull()
+        assertThat(sessions.map { it.familyId }).containsOnly(sessions.first().familyId)
     }
 
     @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     fun `이미 사용한 Refresh Token은 다시 사용할 수 없다`() {
-        val original = authTokenService.issue(userRepository.save(User()))
-        refreshTokenService.refresh(original.refreshToken)
+        try {
+            val original = authTokenService.issue(userRepository.save(User()))
+            val rotated = refreshTokenService.refresh(original.refreshToken)
+
+            assertAuthError(AuthErrorCode.UNUSABLE_REFRESH_TOKEN) {
+                refreshTokenService.refresh(original.refreshToken)
+            }
+            assertAuthError(AuthErrorCode.UNUSABLE_REFRESH_TOKEN) {
+                refreshTokenService.refresh(rotated.refreshToken)
+            }
+            assertThat(authSessionRepository.findAll()).allMatch { it.revokedAt != null }
+        } finally {
+            authSessionRepository.deleteAll()
+            userRepository.deleteAll()
+        }
+    }
+
+    @Test
+    fun `재사용 감지는 다른 로그인 token family를 폐기하지 않는다`() {
+        val user = userRepository.save(User())
+        val compromisedFamily = authTokenService.issue(user)
+        authTokenService.issue(user)
+        refreshTokenService.refresh(compromisedFamily.refreshToken)
 
         assertAuthError(AuthErrorCode.UNUSABLE_REFRESH_TOKEN) {
-            refreshTokenService.refresh(original.refreshToken)
+            refreshTokenService.refresh(compromisedFamily.refreshToken)
         }
+
+        val sessions = authSessionRepository.findAll()
+        val compromisedFamilyId = sessions.first { it.refreshTokenHash == refreshTokenHasher.hash(compromisedFamily.refreshToken) }.familyId
+        assertThat(sessions.filter { it.familyId == compromisedFamilyId }).allMatch { it.revokedAt != null }
+        assertThat(sessions.filter { it.familyId != compromisedFamilyId }).allMatch { it.revokedAt == null }
     }
 
     @Test

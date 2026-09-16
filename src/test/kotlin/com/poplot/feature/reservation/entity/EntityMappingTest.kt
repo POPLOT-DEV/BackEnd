@@ -48,7 +48,14 @@ class EntityMappingTest @Autowired constructor(private val entityManager: Entity
         entityManager.persist(Waitlist(user, slot, 2))
         entityManager.persist(QrTicket(reservation, "ticket-hash", Instant.now()))
         entityManager.persist(SocialAccount(user, SocialProvider.KAKAO, "provider-id"))
-        entityManager.persist(AuthSession(user, "refresh-hash", Instant.now().plusSeconds(3600)))
+        entityManager.persist(
+            AuthSession(
+                user = user,
+                refreshTokenHash = "refresh-hash",
+                expiresAt = Instant.now().plusSeconds(3600),
+                familyId = UUID.randomUUID(),
+            ),
+        )
         entityManager.flush()
 
         assertThat(user.publicId).isNotNull()

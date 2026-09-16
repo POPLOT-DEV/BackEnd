@@ -18,7 +18,7 @@ class RefreshTokenService(
     private val authSessionRepository: AuthSessionRepository,
     private val authTokenService: AuthTokenService,
 ) {
-    @Transactional
+    @Transactional(noRollbackFor = [GeneralException::class])
     fun refresh(refreshToken: String?): IssuedAuthTokens {
         if (refreshToken.isNullOrBlank()) {
             throw GeneralException(AuthErrorCode.REFRESH_TOKEN_REQUIRED)
@@ -30,7 +30,11 @@ class RefreshTokenService(
         ) ?: throw GeneralException(AuthErrorCode.UNUSABLE_REFRESH_TOKEN)
         val now = Instant.now()
 
-        if (session.revokedAt != null || !session.expiresAt.isAfter(now)) {
+        if (session.revokedAt != null) {
+            authSessionRepository.revokeActiveSessionsByFamilyId(session.familyId, now)
+            throw GeneralException(AuthErrorCode.UNUSABLE_REFRESH_TOKEN)
+        }
+        if (!session.expiresAt.isAfter(now)) {
             throw GeneralException(AuthErrorCode.UNUSABLE_REFRESH_TOKEN)
         }
         if (session.user.id != userId || session.user.status != UserStatus.ACTIVE) {
@@ -38,7 +42,7 @@ class RefreshTokenService(
         }
 
         session.revoke(now)
-        return authTokenService.issue(session.user)
+        return authTokenService.issueForFamily(session.user, session.familyId)
     }
 
     private fun validateAndExtractUserId(refreshToken: String): Long =

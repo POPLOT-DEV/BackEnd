@@ -6,6 +6,7 @@ import com.poplot.feature.user.entity.User
 import com.poplot.global.security.jwt.JwtProvider
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.util.UUID
 
 @Service
 class AuthTokenService(
@@ -14,7 +15,14 @@ class AuthTokenService(
     private val authSessionRepository: AuthSessionRepository,
 ) {
     @Transactional
-    fun issue(user: User): IssuedAuthTokens {
+    fun issue(user: User): IssuedAuthTokens =
+        issueForFamily(user, UUID.randomUUID())
+
+    @Transactional
+    fun issueForFamily(
+        user: User,
+        familyId: UUID,
+    ): IssuedAuthTokens {
         val userId = checkNotNull(user.id) { "Cannot issue tokens for a transient user." }
         val accessToken = jwtProvider.createAccessToken(userId)
         val refreshToken = jwtProvider.createRefreshToken(userId)
@@ -23,6 +31,7 @@ class AuthTokenService(
                 user = user,
                 refreshTokenHash = refreshTokenHasher.hash(refreshToken),
                 expiresAt = jwtProvider.getExpiration(refreshToken),
+                familyId = familyId,
             ),
         )
         return IssuedAuthTokens(
