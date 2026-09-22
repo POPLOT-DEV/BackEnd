@@ -2,12 +2,12 @@
 
 팝업스토어 방문 예약과 현장 체크인을 지원하는 POPLOT의 백엔드 서버입니다.
 
-Kotlin과 Spring Boot를 기반으로 예약, 대기열, QR 체크인 기능을 구현하며,
+Java와 Spring Boot를 기반으로 예약, 대기열, QR 체크인 기능을 구현하며,
 고경합 예약 환경에서의 동시성 제어와 대용량 트래픽 처리를 주요 기술 과제로 다룹니다.
 
 ## 기술 스택
 
-- Kotlin 2.2, JVM 21
+- Java 21
 - Spring Boot 4.1, Spring MVC
 - Spring Data JPA, Flyway
 - Spring Security, JWT
@@ -20,7 +20,7 @@ Kotlin과 Spring Boot를 기반으로 예약, 대기열, QR 체크인 기능을 
 도메인별 Layered Architecture를 기본으로 사용합니다. Redis, 메시지 큐, 외부 API처럼 구현 교체나 장애 격리가 필요한 경계에만 Port/Adapter를 선택적으로 적용합니다.
 
 ```text
-src/main/kotlin/com/poplot
+src/main/java/com/poplot
 ├── feature
 │   ├── reservation
 │   │   ├── controller
@@ -32,12 +32,12 @@ src/main/kotlin/com/poplot
 │   │   ├── service
 │   │   ├── exception
 │   │   ├── port
-│   │   │   ├── InventoryPort.kt
-│   │   │   └── NotificationPort.kt
+│   │   │   ├── InventoryPort.java
+│   │   │   └── NotificationPort.java
 │   │   └── adapter
-│   │       ├── DbInventoryAdapter.kt
-│   │       ├── RedisInventoryAdapter.kt
-│   │       └── SqsNotificationAdapter.kt
+│   │       ├── DbInventoryAdapter.java
+│   │       ├── RedisInventoryAdapter.java
+│   │       └── SqsNotificationAdapter.java
 │   ├── timeslot
 │   ├── waitlist
 │   ├── event

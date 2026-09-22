@@ -1,0 +1,58 @@
+package com.poplot.feature.reservation.entity;
+
+import com.poplot.global.common.entity.BaseCreatedTimeEntity;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+import java.time.Instant;
+
+@Entity
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Table(
+    name = "qr_ticket",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_qr_ticket_reservation", columnNames = "reservation_id"),
+        @UniqueConstraint(name = "uk_qr_ticket_token_hash", columnNames = "token_hash")
+    }
+)
+public class QrTicket extends BaseCreatedTimeEntity {
+
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "reservation_id", nullable = false)
+    private Reservation reservation;
+
+    @Column(name = "token_hash", nullable = false, length = 255)
+    private String tokenHash;
+
+    @Column(name = "issued_at", nullable = false)
+    private Instant issuedAt;
+
+    @Column(name = "expires_at")
+    private Instant expiresAt;
+
+    @Column(name = "revoked_at")
+    private Instant revokedAt;
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "qr_ticket_id")
+    private Long id;
+
+    public QrTicket(Reservation reservation, String tokenHash, Instant issuedAt) {
+        this.reservation = reservation;
+        this.tokenHash = tokenHash;
+        this.issuedAt = issuedAt;
+    }
+}
