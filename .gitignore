@@ -39,3 +39,7 @@ logs/
 # Generated JVM files
 hs_err_pid*
 replay_pid*
+
+# CODEX
+.agents/
+AGENTS.md
