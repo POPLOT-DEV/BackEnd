@@ -16,10 +16,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.data.jpa.repository.support.SimpleJpaRepository;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
@@ -33,7 +34,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -62,7 +63,7 @@ class ReservationRollbackIntegrationTest {
     private TransactionTemplate transactionTemplate;
     @Autowired
     private JdbcTemplate jdbcTemplate;
-    @MockitoBean
+    @MockitoSpyBean
     private ReservationRepository reservationRepository;
 
     @Test
@@ -72,15 +73,23 @@ class ReservationRollbackIntegrationTest {
         TimeSlot timeSlot = persistTimeSlot();
         long initialVersion = timeSlot.getVersion();
         AtomicInteger flushedReservedCount = new AtomicInteger(-1);
+        AtomicInteger flushedReservationCount = new AtomicInteger(-1);
         AtomicLong flushedVersion = new AtomicLong(-1);
-        when(reservationRepository.save(any(Reservation.class)))
-            .thenAnswer(invocation -> {
-                entityManager.flush();
+        SimpleJpaRepository<Reservation, Long> repositoryDelegate =
+            new SimpleJpaRepository<>(Reservation.class, entityManager);
+        doAnswer(invocation -> {
                 Reservation reservation = invocation.getArgument(0);
+                repositoryDelegate.save(reservation);
+                entityManager.flush();
                 flushedReservedCount.set(reservation.getTimeSlot().getReservedCount());
                 flushedVersion.set(reservation.getTimeSlot().getVersion());
+                Number reservationCount = (Number) entityManager.createNativeQuery("SELECT COUNT(*) FROM reservation")
+                    .getSingleResult();
+                flushedReservationCount.set(reservationCount.intValue());
                 throw new IllegalStateException("forced reservation persistence failure");
-            });
+            })
+            .when(reservationRepository)
+            .save(any(Reservation.class));
 
         mockMvc.perform(post("/reservations")
                 .header("Authorization", "Bearer " + jwtProvider.createAccessToken(user.getId()))
@@ -92,6 +101,7 @@ class ReservationRollbackIntegrationTest {
         Integer reservationCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM reservation", Integer.class);
         assertThat(flushedReservedCount).hasValue(2);
         assertThat(flushedVersion).hasValue(initialVersion + 1);
+        assertThat(flushedReservationCount).hasValue(1);
         assertThat(savedTimeSlot.getReservedCount()).isZero();
         assertThat(savedTimeSlot.getVersion()).isEqualTo(initialVersion);
         assertThat(reservationCount).isZero();
