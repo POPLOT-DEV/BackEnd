@@ -28,6 +28,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -69,8 +71,16 @@ class ReservationRollbackIntegrationTest {
         User user = userRepository.save(User.create("user@example.com", "user"));
         TimeSlot timeSlot = persistTimeSlot();
         long initialVersion = timeSlot.getVersion();
+        AtomicInteger flushedReservedCount = new AtomicInteger(-1);
+        AtomicLong flushedVersion = new AtomicLong(-1);
         when(reservationRepository.save(any(Reservation.class)))
-            .thenThrow(new IllegalStateException("forced reservation persistence failure"));
+            .thenAnswer(invocation -> {
+                entityManager.flush();
+                Reservation reservation = invocation.getArgument(0);
+                flushedReservedCount.set(reservation.getTimeSlot().getReservedCount());
+                flushedVersion.set(reservation.getTimeSlot().getVersion());
+                throw new IllegalStateException("forced reservation persistence failure");
+            });
 
         mockMvc.perform(post("/reservations")
                 .header("Authorization", "Bearer " + jwtProvider.createAccessToken(user.getId()))
@@ -80,6 +90,8 @@ class ReservationRollbackIntegrationTest {
 
         TimeSlot savedTimeSlot = timeSlotRepository.findById(timeSlot.getId()).orElseThrow();
         Integer reservationCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM reservation", Integer.class);
+        assertThat(flushedReservedCount).hasValue(2);
+        assertThat(flushedVersion).hasValue(initialVersion + 1);
         assertThat(savedTimeSlot.getReservedCount()).isZero();
         assertThat(savedTimeSlot.getVersion()).isEqualTo(initialVersion);
         assertThat(reservationCount).isZero();
