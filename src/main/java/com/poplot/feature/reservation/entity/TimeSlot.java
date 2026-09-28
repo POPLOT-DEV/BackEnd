@@ -88,4 +88,11 @@ public class TimeSlot extends BaseTimeEntity {
     public boolean isSoldOut() {
         return getRemainingCount() <= 0;
     }
+
+    public void reserve(int partySize) {
+        if (partySize < 1 || partySize > getRemainingCount()) {
+            throw new IllegalArgumentException("Party size exceeds the remaining capacity.");
+        }
+        reservedCount += partySize;
+    }
 }
