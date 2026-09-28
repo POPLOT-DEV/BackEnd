@@ -29,4 +29,12 @@ class JwtProviderTest {
         assertThat(second).isNotEqualTo(first);
         assertThat(provider.parseClaims(first).getId()).isNotEqualTo(provider.parseClaims(second).getId());
     }
+
+    @Test
+    @DisplayName("role-aware access token contains the user's actual role")
+    void roleAwareAccessTokenContainsActualRole() {
+        String accessToken = provider.createAccessToken(1L, "ADMIN");
+
+        assertThat(provider.parseClaims(accessToken).get("role", String.class)).isEqualTo("ADMIN");
+    }
 }

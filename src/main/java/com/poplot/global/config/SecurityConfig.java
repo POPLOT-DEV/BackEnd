@@ -21,6 +21,7 @@ public class SecurityConfig {
         "/actuator/health",
         "/auth/oauth/**",
         "/auth/refresh",
+        "/dev/auth/token",
         "/api/v1/examples/**",
     };
 

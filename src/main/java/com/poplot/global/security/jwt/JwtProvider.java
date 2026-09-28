@@ -37,6 +37,13 @@ public class JwtProvider {
         return createToken(userId, "access", accessTokenExpiration);
     }
 
+    public String createAccessToken(long userId, String role) {
+        Instant now = Instant.now();
+        return Jwts.builder().id(UUID.randomUUID().toString()).subject(Long.toString(userId)).claim("type", "access")
+            .claim("role", role).issuedAt(Date.from(now)).expiration(Date.from(now.plusMillis(accessTokenExpiration)))
+            .signWith(secretKey).compact();
+    }
+
     public String createRefreshToken(long userId) {
         return createToken(userId, "refresh", refreshTokenExpiration);
     }
