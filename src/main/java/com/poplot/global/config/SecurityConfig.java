@@ -22,6 +22,7 @@ public class SecurityConfig {
         "/auth/oauth/**",
         "/auth/refresh",
         "/dev/auth/token",
+        "/events/**",
         "/api/v1/examples/**",
     };
 

@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 @Getter
 @RequiredArgsConstructor
 public enum ErrorCode implements BaseErrorCode {
+    INVALID_PAGE_REQUEST(HttpStatus.BAD_REQUEST, "COMMON_400_01", "올바르지 않은 페이지 요청입니다."),
     INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "COMMON_400", "입력값이 올바르지 않습니다."),
     INVALID_REQUEST_BODY(HttpStatus.BAD_REQUEST, "COMMON_400_1", "요청 본문을 읽을 수 없습니다."),
     MISSING_REQUEST_PARAMETER(HttpStatus.BAD_REQUEST, "COMMON_400_2", "필수 요청 파라미터가 누락되었습니다."),
