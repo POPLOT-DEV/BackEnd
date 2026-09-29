@@ -2,6 +2,8 @@ package com.poplot.feature.reservation.service;
 
 import com.poplot.feature.reservation.dto.request.CreateReservationRequest;
 import com.poplot.feature.reservation.exception.ReservationErrorCode;
+import com.poplot.feature.reservation.repository.ReservationRepository;
+import com.poplot.feature.user.service.CurrentUserService;
 import com.poplot.global.exception.GeneralException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,7 +21,11 @@ class ReservationServiceTest {
     @DisplayName("optimistic locking conflict is translated to insufficient capacity")
     void translatesOptimisticLockingConflict() {
         ReservationCreationTransaction transaction = mock(ReservationCreationTransaction.class);
-        ReservationService service = new ReservationService(transaction);
+        ReservationService service = new ReservationService(
+            transaction,
+            mock(ReservationRepository.class),
+            mock(CurrentUserService.class)
+        );
         CreateReservationRequest request = new CreateReservationRequest(UUID.randomUUID().toString(), 1);
         when(transaction.create(request)).thenThrow(new ObjectOptimisticLockingFailureException("TimeSlot", 1L));
 
