@@ -77,11 +77,16 @@ public class Reservation extends BaseTimeEntity {
     private Long id;
 
     public Reservation(User user, TimeSlot timeSlot, String reservationNumber, int partySize) {
+        this(user, timeSlot, reservationNumber, partySize, null);
+    }
+
+    public Reservation(User user, TimeSlot timeSlot, String reservationNumber, int partySize, Instant holdExpiresAt) {
         this.user = user;
         this.timeSlot = timeSlot;
         this.reservationNumber = reservationNumber;
         this.partySize = partySize;
         this.status = ReservationStatus.PENDING;
+        this.holdExpiresAt = holdExpiresAt;
         this.publicId = UUID.randomUUID();
     }
 }
