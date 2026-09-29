@@ -39,9 +39,6 @@ reviews:
   # -------------------------------------------------------------- #
 
   tools:
-    detekt:
-      enabled: true
-
     github-checks:
       enabled: true
 
@@ -50,7 +47,7 @@ reviews:
   # -------------------------------------------------------------- #
 
   path_instructions:
-    - path: "src/main/kotlin/com/poplot/feature/**/controller/**"
+    - path: "src/main/java/com/poplot/feature/**/controller/**"
       instructions: |
         - Controller는 HTTP 요청/응답 처리와 Service 호출에 집중하는지 확인하세요.
         - Controller에 비즈니스 로직이나 Repository 직접 접근이 포함되지 않았는지 확인하세요.
@@ -64,9 +61,9 @@ reviews:
     # DTO
     # ------------------------------------------------------------ #
 
-    - path: "src/main/kotlin/com/poplot/feature/**/dto/**"
+    - path: "src/main/java/com/poplot/feature/**/dto/**"
       instructions: |
-        - 요청 DTO의 필수값과 Kotlin nullable 설계가 실제 API 계약과 일치하는지 확인하세요.
+        - 요청 DTO의 필수값과 null 허용 여부가 실제 API 계약과 일치하는지 확인하세요.
         - 문자열 길이, 숫자 범위, 인원 수, 날짜/시간 등 필요한 입력 검증이 존재하는지 확인하세요.
         - Entity를 API DTO 대신 직접 사용하는 코드가 없는지 확인하세요.
         - 내부 구현 정보, 인증 정보 또는 민감 정보가 응답 DTO에 노출되지 않는지 확인하세요.
@@ -76,10 +73,10 @@ reviews:
     # Entity
     # ------------------------------------------------------------ #
 
-    - path: "src/main/kotlin/com/poplot/feature/**/entity/**"
+    - path: "src/main/java/com/poplot/feature/**/entity/**"
       instructions: |
-        - Kotlin과 JPA를 함께 사용할 때 constructor, proxy, final class 및 nullable 관련 문제가 없는지 확인하세요.
-        - Kotlin nullable 타입과 DB NOT NULL 제약 조건이 일치하는지 확인하세요.
+        - JPA Entity의 기본 생성자 접근 수준과 Hibernate proxy 생성 조건이 올바른지 확인하세요.
+        - Java 필드의 null 허용 여부와 DB NOT NULL 제약 조건이 일치하는지 확인하세요.
         - JPA 연관관계의 owning side가 올바르게 설정되어 있는지 확인하세요.
         - 양방향 연관관계가 실제 필요 없이 사용되지 않았는지 확인하세요.
         - CascadeType.ALL 또는 orphanRemoval이 예상하지 못한 데이터 변경이나 삭제를 만들 가능성이 없는지 확인하세요.
@@ -92,7 +89,7 @@ reviews:
     # Repository
     # ------------------------------------------------------------ #
 
-    - path: "src/main/kotlin/com/poplot/feature/**/repository/**"
+    - path: "src/main/java/com/poplot/feature/**/repository/**"
       instructions: |
         - N+1 문제가 발생할 가능성이 있는지 확인하세요.
         - Entity 전체를 조회한 뒤 애플리케이션에서 불필요하게 필터링하거나 집계하지 않는지 확인하세요.
@@ -108,7 +105,7 @@ reviews:
     # Service
     # ------------------------------------------------------------ #
 
-    - path: "src/main/kotlin/com/poplot/feature/**/service/**"
+    - path: "src/main/java/com/poplot/feature/**/service/**"
       instructions: |
         - Service가 유스케이스와 트랜잭션 처리에 집중하는지 확인하세요.
         - 트랜잭션 경계가 실제 비즈니스 작업 단위와 일치하는지 확인하세요.
@@ -127,7 +124,7 @@ reviews:
     # Port
     # ------------------------------------------------------------ #
 
-    - path: "src/main/kotlin/com/poplot/feature/**/port/**"
+    - path: "src/main/java/com/poplot/feature/**/port/**"
       instructions: |
         - Port가 Redis, SQS, HTTP 같은 기술 이름이 아니라 비즈니스가 요구하는 기능을 표현하는 인터페이스인지 확인하세요.
         - 단순 JPA CRUD까지 불필요하게 Port로 추상화하고 있지 않은지 확인하세요.
@@ -139,7 +136,7 @@ reviews:
     # Adapter
     # ------------------------------------------------------------ #
 
-    - path: "src/main/kotlin/com/poplot/feature/**/adapter/**"
+    - path: "src/main/java/com/poplot/feature/**/adapter/**"
       instructions: |
         - Adapter가 Port 구현과 외부 시스템 연동 책임에 집중하는지 확인하세요.
         - Redis, 메시지 큐, 외부 API 장애가 핵심 DB 트랜잭션까지 불필요하게 전파되지 않는지 확인하세요.
@@ -153,7 +150,7 @@ reviews:
     # Feature Exception
     # ------------------------------------------------------------ #
 
-    - path: "src/main/kotlin/com/poplot/feature/**/exception/**"
+    - path: "src/main/java/com/poplot/feature/**/exception/**"
       instructions: |
         - 예외 이름과 오류 코드가 실제 비즈니스 실패 상황을 명확하게 표현하는지 확인하세요.
         - 동일한 의미의 예외가 feature 내부에서 중복 정의되지 않았는지 확인하세요.
@@ -164,7 +161,7 @@ reviews:
     # Security
     # ------------------------------------------------------------ #
 
-    - path: "src/main/kotlin/com/poplot/global/security/**"
+    - path: "src/main/java/com/poplot/global/security/**"
       instructions: |
         - JWT 서명 검증과 만료 검증이 올바르게 수행되는지 확인하세요.
         - 인증되지 않은 사용자 입력이나 JWT claim을 검증 없이 신뢰하지 않는지 확인하세요.
@@ -179,7 +176,7 @@ reviews:
     # Global Exception
     # ------------------------------------------------------------ #
 
-    - path: "src/main/kotlin/com/poplot/global/exception/**"
+    - path: "src/main/java/com/poplot/global/exception/**"
       instructions: |
         - 예외가 적절한 HTTP Status와 서비스 오류 코드로 변환되는지 확인하세요.
         - API 오류 응답이 프로젝트 공통 응답 형식을 일관되게 따르는지 확인하세요.
@@ -191,7 +188,7 @@ reviews:
     # Logging
     # ------------------------------------------------------------ #
 
-    - path: "src/main/kotlin/com/poplot/global/logging/**"
+    - path: "src/main/java/com/poplot/global/logging/**"
       instructions: |
         - JWT, 개인정보, 인증 정보 등 민감 데이터가 로그에 기록되지 않는지 확인하세요.
         - X-Request-Id가 요청 흐름 전체에서 일관되게 유지되는지 확인하세요.
@@ -203,7 +200,7 @@ reviews:
     # Configuration
     # ------------------------------------------------------------ #
 
-    - path: "src/main/kotlin/com/poplot/global/config/**"
+    - path: "src/main/java/com/poplot/global/config/**"
       instructions: |
         - 운영 환경에서 안전하지 않은 기본값이나 fallback 설정이 존재하지 않는지 확인하세요.
         - secret 또는 credential이 코드에 하드코딩되지 않았는지 확인하세요.
@@ -232,7 +229,7 @@ reviews:
     # Test
     # ------------------------------------------------------------ #
 
-    - path: "src/test/kotlin/**"
+    - path: "src/test/java/**"
       instructions: |
         - 정상 케이스뿐 아니라 실패 케이스와 경계값 테스트가 존재하는지 확인하세요.
         - 예약, 취소, 대기, 체크인처럼 상태 전이가 있는 기능은 잘못된 상태 전이에 대한 테스트가 존재하는지 확인하세요.
