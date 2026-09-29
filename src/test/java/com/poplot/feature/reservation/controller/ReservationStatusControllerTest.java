@@ -77,11 +77,12 @@ class ReservationStatusControllerTest {
     }
 
     @Test
-    @DisplayName("non-owner cannot retrieve or change reservation")
+    @DisplayName("non-owner cannot retrieve, confirm, or cancel reservation")
     void rejectsNonOwner() throws Exception {
         User owner = userRepository.save(User.create("owner@example.com", "owner"));
         User other = userRepository.save(User.create("other@example.com", "other"));
         Reservation reservation = persistReservation(owner, ReservationStatus.PENDING, Instant.now().plusSeconds(600), null);
+        Long timeSlotId = reservation.getTimeSlot().getId();
 
         mockMvc.perform(get("/reservations/{publicId}", reservation.getPublicId())
                 .header("Authorization", bearerToken(other)))
@@ -91,6 +92,14 @@ class ReservationStatusControllerTest {
                 .header("Authorization", bearerToken(other)))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.code").value("RESERVATION_403_01"));
+        mockMvc.perform(post("/reservations/{publicId}/cancel", reservation.getPublicId())
+                .header("Authorization", bearerToken(other)))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("RESERVATION_403_01"));
+
+        assertThat(reservationRepository.findById(reservation.getId()).orElseThrow().getStatus())
+            .isEqualTo(ReservationStatus.PENDING);
+        assertThat(timeSlotRepository.findById(timeSlotId).orElseThrow().getReservedCount()).isEqualTo(2);
     }
 
     @Test
