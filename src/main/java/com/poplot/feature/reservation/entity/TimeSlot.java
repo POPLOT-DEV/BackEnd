@@ -95,4 +95,11 @@ public class TimeSlot extends BaseTimeEntity {
         }
         reservedCount += partySize;
     }
+
+    public void release(int partySize) {
+        if (partySize < 1 || partySize > reservedCount) {
+            throw new IllegalArgumentException("Party size exceeds the reserved count.");
+        }
+        reservedCount -= partySize;
+    }
 }

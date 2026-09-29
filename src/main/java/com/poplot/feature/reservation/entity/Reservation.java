@@ -1,8 +1,10 @@
 package com.poplot.feature.reservation.entity;
 
 import com.poplot.feature.reservation.enums.ReservationStatus;
+import com.poplot.feature.reservation.exception.ReservationErrorCode;
 import com.poplot.feature.user.entity.User;
 import com.poplot.global.common.entity.BaseTimeEntity;
+import com.poplot.global.exception.GeneralException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -88,5 +90,27 @@ public class Reservation extends BaseTimeEntity {
         this.status = ReservationStatus.PENDING;
         this.holdExpiresAt = holdExpiresAt;
         this.publicId = UUID.randomUUID();
+    }
+
+    public void confirm(Instant now) {
+        if (status != ReservationStatus.PENDING) {
+            throw new GeneralException(ReservationErrorCode.INVALID_CONFIRM_STATUS);
+        }
+        if (holdExpiresAt != null && now.isAfter(holdExpiresAt)) {
+            throw new GeneralException(ReservationErrorCode.CONFIRMATION_EXPIRED);
+        }
+        status = ReservationStatus.CONFIRMED;
+        confirmedAt = now;
+    }
+
+    public void cancel(Instant now, Instant cancellationDeadline) {
+        if (status != ReservationStatus.PENDING && status != ReservationStatus.CONFIRMED) {
+            throw new GeneralException(ReservationErrorCode.INVALID_CANCEL_STATUS);
+        }
+        if (cancellationDeadline != null && now.isAfter(cancellationDeadline)) {
+            throw new GeneralException(ReservationErrorCode.CANCELLATION_EXPIRED);
+        }
+        status = ReservationStatus.CANCELED;
+        canceledAt = now;
     }
 }
