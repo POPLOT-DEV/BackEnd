@@ -51,8 +51,20 @@ public class QrTicket extends BaseCreatedTimeEntity {
     private Long id;
 
     public QrTicket(Reservation reservation, String tokenHash, Instant issuedAt) {
+        this(reservation, tokenHash, issuedAt, null);
+    }
+
+    public QrTicket(Reservation reservation, String tokenHash, Instant issuedAt, Instant expiresAt) {
         this.reservation = reservation;
         this.tokenHash = tokenHash;
         this.issuedAt = issuedAt;
+        this.expiresAt = expiresAt;
+    }
+
+    public void reissue(String tokenHash, Instant issuedAt, Instant expiresAt) {
+        this.tokenHash = tokenHash;
+        this.issuedAt = issuedAt;
+        this.expiresAt = expiresAt;
+        this.revokedAt = null;
     }
 }

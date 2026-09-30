@@ -16,6 +16,9 @@ jwt:
   access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION}
   refresh-token-expiration: ${JWT_REFRESH_TOKEN_EXPIRATION}
 
+qr-ticket:
+  secret: ${QR_TICKET_SECRET:${jwt.secret}}
+
 oauth:
   kakao:
     enabled: ${KAKAO_OAUTH_ENABLED:false}

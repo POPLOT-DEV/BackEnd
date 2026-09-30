@@ -2,6 +2,7 @@ package com.poplot.feature.reservation.entity;
 
 import com.poplot.feature.reservation.enums.ReservationStatus;
 import com.poplot.feature.reservation.exception.ReservationErrorCode;
+import com.poplot.feature.reservation.exception.CheckInErrorCode;
 import com.poplot.feature.user.entity.User;
 import com.poplot.global.common.entity.BaseTimeEntity;
 import com.poplot.global.exception.GeneralException;
@@ -112,5 +113,16 @@ public class Reservation extends BaseTimeEntity {
         }
         status = ReservationStatus.CANCELED;
         canceledAt = now;
+    }
+
+    public void checkIn(Instant now) {
+        if (status == ReservationStatus.CHECKED_IN) {
+            throw new GeneralException(CheckInErrorCode.ALREADY_CHECKED_IN);
+        }
+        if (status != ReservationStatus.CONFIRMED) {
+            throw new GeneralException(CheckInErrorCode.INVALID_RESERVATION_STATUS);
+        }
+        status = ReservationStatus.CHECKED_IN;
+        checkedInAt = now;
     }
 }
