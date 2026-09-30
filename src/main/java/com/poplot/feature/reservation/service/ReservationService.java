@@ -5,13 +5,17 @@ import com.poplot.feature.reservation.dto.response.CreateReservationResponse;
 import com.poplot.feature.reservation.dto.response.ReservationDetailResponse;
 import com.poplot.feature.reservation.dto.response.ReservationStatusResponse;
 import com.poplot.feature.reservation.entity.Reservation;
+import com.poplot.feature.reservation.entity.TimeSlot;
 import com.poplot.feature.reservation.exception.ReservationErrorCode;
 import com.poplot.feature.reservation.repository.ReservationRepository;
+import com.poplot.feature.reservation.repository.TimeSlotRepository;
 import com.poplot.feature.user.entity.User;
 import com.poplot.feature.user.service.CurrentUserService;
 import com.poplot.global.exception.GeneralException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,11 +31,14 @@ public class ReservationService {
 
     private final ReservationCreationTransaction reservationCreationTransaction;
     private final ReservationRepository reservationRepository;
+    private final TimeSlotRepository timeSlotRepository;
     private final CurrentUserService currentUserService;
 
     public CreateReservationResponse create(CreateReservationRequest request) {
         try {
             return reservationCreationTransaction.create(request);
+        } catch (PessimisticLockingFailureException | QueryTimeoutException exception) {
+            throw new GeneralException(ReservationErrorCode.LOCK_ACQUISITION_FAILED);
         } catch (OptimisticLockingFailureException exception) {
             throw new GeneralException(ReservationErrorCode.INSUFFICIENT_CAPACITY);
         }
@@ -49,13 +56,23 @@ public class ReservationService {
         return ReservationStatusResponse.confirmed(reservation);
     }
 
-    @Transactional
+    @Transactional(timeout = 3)
     public ReservationStatusResponse cancel(String reservationPublicId) {
         Reservation reservation = getOwnedReservation(reservationPublicId);
+        var lockedTimeSlot = getTimeSlotForUpdate(reservation.getTimeSlot().getId());
         Instant now = Instant.now();
         reservation.cancel(now, calculateCancellationDeadline(reservation));
-        reservation.getTimeSlot().release(reservation.getPartySize());
+        lockedTimeSlot.release(reservation.getPartySize());
         return ReservationStatusResponse.canceled(reservation);
+    }
+
+    private TimeSlot getTimeSlotForUpdate(Long timeSlotId) {
+        try {
+            return timeSlotRepository.findForUpdateById(timeSlotId)
+                .orElseThrow(() -> new GeneralException(ReservationErrorCode.TIME_SLOT_NOT_FOUND));
+        } catch (PessimisticLockingFailureException | QueryTimeoutException exception) {
+            throw new GeneralException(ReservationErrorCode.LOCK_ACQUISITION_FAILED);
+        }
     }
 
     private Reservation getOwnedReservation(String reservationPublicId) {

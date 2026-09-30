@@ -36,7 +36,7 @@ class ReservationCreationTransaction {
     private final TimeSlotRepository timeSlotRepository;
     private final ReservationRepository reservationRepository;
 
-    @Transactional
+    @Transactional(timeout = 3)
     public CreateReservationResponse create(CreateReservationRequest request) {
         validatePartySize(request);
         TimeSlot timeSlot = getTimeSlot(request);
@@ -84,7 +84,7 @@ class ReservationCreationTransaction {
         } catch (IllegalArgumentException exception) {
             throw new GeneralException(ReservationErrorCode.TIME_SLOT_NOT_FOUND);
         }
-        return timeSlotRepository.findByPublicId(publicId)
+        return timeSlotRepository.findForUpdateByPublicId(publicId)
             .orElseThrow(() -> new GeneralException(ReservationErrorCode.TIME_SLOT_NOT_FOUND));
     }
 
