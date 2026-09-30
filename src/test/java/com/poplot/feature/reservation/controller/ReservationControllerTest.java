@@ -38,6 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Sql(statements = {
+    "DELETE FROM qr_ticket",
     "DELETE FROM reservation",
     "DELETE FROM time_slot",
     "DELETE FROM event",

@@ -4,6 +4,8 @@ import com.poplot.feature.reservation.dto.request.CreateReservationRequest;
 import com.poplot.feature.reservation.dto.response.CreateReservationResponse;
 import com.poplot.feature.reservation.dto.response.ReservationDetailResponse;
 import com.poplot.feature.reservation.dto.response.ReservationStatusResponse;
+import com.poplot.feature.reservation.dto.response.QrTicketResponse;
+import com.poplot.feature.reservation.service.QrTicketService;
 import com.poplot.feature.reservation.service.ReservationService;
 import com.poplot.global.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/reservations")
 public class ReservationController {
     private final ReservationService reservationService;
+    private final QrTicketService qrTicketService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -33,6 +36,11 @@ public class ReservationController {
     @GetMapping("/{reservationPublicId}")
     public ApiResponse<ReservationDetailResponse> getDetail(@PathVariable String reservationPublicId) {
         return ApiResponse.success(reservationService.getDetail(reservationPublicId));
+    }
+
+    @GetMapping("/{reservationPublicId}/ticket")
+    public ApiResponse<QrTicketResponse> getTicket(@PathVariable String reservationPublicId) {
+        return ApiResponse.success(qrTicketService.getTicket(reservationPublicId));
     }
 
     @PostMapping("/{reservationPublicId}/confirm")

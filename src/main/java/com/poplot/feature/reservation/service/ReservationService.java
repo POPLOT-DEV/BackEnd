@@ -51,14 +51,14 @@ public class ReservationService {
 
     @Transactional
     public ReservationStatusResponse confirm(String reservationPublicId) {
-        Reservation reservation = getOwnedReservation(reservationPublicId);
+        Reservation reservation = getOwnedReservationForUpdate(reservationPublicId);
         reservation.confirm(Instant.now());
         return ReservationStatusResponse.confirmed(reservation);
     }
 
     @Transactional(timeout = 3)
     public ReservationStatusResponse cancel(String reservationPublicId) {
-        Reservation reservation = getOwnedReservation(reservationPublicId);
+        Reservation reservation = getOwnedReservationForUpdate(reservationPublicId);
         var lockedTimeSlot = getTimeSlotForUpdate(reservation.getTimeSlot().getId());
         Instant now = Instant.now();
         reservation.cancel(now, calculateCancellationDeadline(reservation));
@@ -76,19 +76,36 @@ public class ReservationService {
     }
 
     private Reservation getOwnedReservation(String reservationPublicId) {
+        UUID publicId = parseReservationPublicId(reservationPublicId);
+        Reservation reservation = reservationRepository.findByPublicId(publicId)
+            .orElseThrow(() -> new GeneralException(ReservationErrorCode.RESERVATION_NOT_FOUND));
+        validateOwner(reservation);
+        return reservation;
+    }
+
+    private Reservation getOwnedReservationForUpdate(String reservationPublicId) {
+        UUID publicId = parseReservationPublicId(reservationPublicId);
+        Reservation reservation = reservationRepository.findForUpdateByPublicId(publicId)
+            .orElseThrow(() -> new GeneralException(ReservationErrorCode.RESERVATION_NOT_FOUND));
+        validateOwner(reservation);
+        return reservation;
+    }
+
+    private UUID parseReservationPublicId(String reservationPublicId) {
         UUID publicId;
         try {
             publicId = UUID.fromString(reservationPublicId);
         } catch (IllegalArgumentException | NullPointerException exception) {
             throw new GeneralException(ReservationErrorCode.RESERVATION_NOT_FOUND);
         }
-        Reservation reservation = reservationRepository.findByPublicId(publicId)
-            .orElseThrow(() -> new GeneralException(ReservationErrorCode.RESERVATION_NOT_FOUND));
+        return publicId;
+    }
+
+    private void validateOwner(Reservation reservation) {
         User currentUser = currentUserService.getCurrentUser();
         if (!reservation.getUser().getId().equals(currentUser.getId())) {
             throw new GeneralException(ReservationErrorCode.FORBIDDEN_RESERVATION);
         }
-        return reservation;
     }
 
     private Instant calculateCancellationDeadline(Reservation reservation) {

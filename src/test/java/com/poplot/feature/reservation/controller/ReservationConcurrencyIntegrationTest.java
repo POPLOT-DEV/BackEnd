@@ -3,11 +3,17 @@ package com.poplot.feature.reservation.controller;
 import com.poplot.feature.event.entity.Event;
 import com.poplot.feature.event.enums.EventStatus;
 import com.poplot.feature.reservation.entity.Reservation;
+import com.poplot.feature.reservation.entity.QrTicket;
 import com.poplot.feature.reservation.entity.TimeSlot;
+import com.poplot.feature.reservation.enums.ReservationStatus;
+import com.poplot.feature.reservation.repository.QrTicketRepository;
 import com.poplot.feature.reservation.repository.ReservationRepository;
 import com.poplot.feature.reservation.repository.TimeSlotRepository;
+import com.poplot.feature.reservation.token.QrTokenProvider;
 import com.poplot.feature.store.entity.Store;
 import com.poplot.feature.user.entity.User;
+import com.poplot.feature.user.enums.UserRole;
+import com.poplot.feature.user.enums.UserStatus;
 import com.poplot.feature.user.repository.UserRepository;
 import com.poplot.global.security.jwt.JwtProvider;
 import jakarta.persistence.EntityManager;
@@ -31,9 +37,13 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -49,6 +59,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @AutoConfigureMockMvc
 @Testcontainers(disabledWithoutDocker = true)
 @Sql(statements = {
+    "DELETE FROM qr_ticket",
     "DELETE FROM reservation",
     "DELETE FROM time_slot",
     "DELETE FROM event",
@@ -69,9 +80,13 @@ class ReservationConcurrencyIntegrationTest {
     @Autowired
     private ReservationRepository reservationRepository;
     @Autowired
+    private QrTicketRepository qrTicketRepository;
+    @Autowired
     private TimeSlotRepository timeSlotRepository;
     @Autowired
     private JwtProvider jwtProvider;
+    @Autowired
+    private QrTokenProvider qrTokenProvider;
     @Autowired
     private TransactionTemplate transactionTemplate;
     @Autowired
@@ -158,6 +173,35 @@ class ReservationConcurrencyIntegrationTest {
             lockHolder.get(5, TimeUnit.SECONDS);
             executor.shutdownNow();
         }
+    }
+
+    @Test
+    @DisplayName("two concurrent scans check in a reservation exactly once")
+    void concurrentScansCheckInExactlyOnce() throws Exception {
+        User owner = userRepository.save(User.create("owner@example.com", "owner"));
+        User staff = userRepository.save(User.builder()
+            .email("staff@example.com")
+            .name("staff")
+            .role(UserRole.STAFF)
+            .status(UserStatus.ACTIVE)
+            .build());
+        Reservation reservation = persistConfirmedReservationForCurrentCheckIn(owner);
+        String qrToken = qrTokenProvider.createToken(reservation.getPublicId());
+        transactionTemplate.executeWithoutResult(status -> qrTicketRepository.save(
+            new QrTicket(reservationRepository.findById(reservation.getId()).orElseThrow(), qrTokenProvider.hash(qrToken), Instant.now())
+        ));
+        Callable<Integer> checkInRequest = () -> mockMvc.perform(post("/staff/check-ins")
+                .header("Authorization", bearerToken(staff))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"qrToken\":\"" + qrToken + "\"}"))
+            .andReturn().getResponse().getStatus();
+
+        List<Integer> statuses = runConcurrently(List.of(checkInRequest, checkInRequest));
+
+        assertThat(statuses).containsExactlyInAnyOrder(200, 409);
+        Reservation saved = reservationRepository.findById(reservation.getId()).orElseThrow();
+        assertThat(saved.getStatus()).isEqualTo(ReservationStatus.CHECKED_IN);
+        assertThat(saved.getCheckedInAt()).isNotNull();
     }
 
     private List<Integer> runConcurrently(List<Callable<Integer>> requests) throws Exception {
@@ -251,6 +295,42 @@ class ReservationConcurrencyIntegrationTest {
             entityManager.persist(timeSlot);
             entityManager.flush();
             return timeSlot;
+        });
+    }
+
+    private Reservation persistConfirmedReservationForCurrentCheckIn(User owner) {
+        return transactionTemplate.execute(status -> {
+            Store store = new Store("check-in-store");
+            entityManager.persist(store);
+            LocalDateTime slotStart = LocalDateTime.now(ZoneId.of("Asia/Seoul")).truncatedTo(ChronoUnit.MINUTES);
+            Event event = new Event(
+                store,
+                "check-in-event",
+                Instant.now().minusSeconds(3_600),
+                Instant.now().plusSeconds(3_600),
+                slotStart.toLocalDate(),
+                slotStart.toLocalDate(),
+                4,
+                10
+            );
+            ReflectionTestUtils.setField(event, "status", EventStatus.RESERVATION_OPEN);
+            ReflectionTestUtils.setField(event, "checkInOpenMinutes", 30);
+            ReflectionTestUtils.setField(event, "checkInCloseMinutes", 30);
+            entityManager.persist(event);
+            TimeSlot timeSlot = new TimeSlot(
+                event,
+                slotStart.toLocalDate(),
+                slotStart.toLocalTime(),
+                slotStart.plusHours(1).toLocalTime(),
+                4
+            );
+            timeSlot.reserve(2);
+            entityManager.persist(timeSlot);
+            Reservation reservation = new Reservation(owner, timeSlot, "R-" + UUID.randomUUID(), 2);
+            ReflectionTestUtils.setField(reservation, "status", ReservationStatus.CONFIRMED);
+            entityManager.persist(reservation);
+            entityManager.flush();
+            return reservation;
         });
     }
 
