@@ -3,6 +3,9 @@ package com.poplot.feature.reservation.token;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -23,6 +26,20 @@ class QrTokenProviderTest {
         assertThat(secondToken).isNotEqualTo(firstToken);
         assertThat(second.getKeyId()).isNotEqualTo(first.getKeyId());
         assertThat(first.matches(firstToken, first.hash(firstToken))).isTrue();
+    }
+
+    @Test
+    @DisplayName("key identifier is stable per secret and is not a plain hash of the secret")
+    void derivesKeyIdWithoutExposingSecretHash() throws Exception {
+        String secret = "stable-qr-ticket-secret-key-1234567890";
+        String plainSecretHash = HexFormat.of().formatHex(
+            MessageDigest.getInstance("SHA-256").digest(secret.getBytes(StandardCharsets.UTF_8))
+        );
+
+        String keyId = new QrTokenProvider(secret).getKeyId();
+
+        assertThat(keyId).isEqualTo(new QrTokenProvider(secret).getKeyId());
+        assertThat(keyId).hasSize(64).isNotEqualTo(plainSecretHash);
     }
 
     @Test

@@ -16,6 +16,7 @@ import java.util.UUID;
 public class QrTokenProvider {
     private static final String HMAC_ALGORITHM = "HmacSHA256";
     private static final String TOKEN_PURPOSE = "poplot:qr-ticket:";
+    private static final String KEY_ID_PURPOSE = "poplot:qr-ticket-key-id";
     private static final int MINIMUM_SECRET_BYTES = 32;
 
     private final SecretKeySpec secretKey;
@@ -27,18 +28,12 @@ public class QrTokenProvider {
             throw new IllegalArgumentException("QR ticket secret must be at least 32 bytes.");
         }
         this.secretKey = new SecretKeySpec(secretBytes, HMAC_ALGORITHM);
-        this.keyId = digest(secretBytes);
+        this.keyId = HexFormat.of().formatHex(sign(KEY_ID_PURPOSE));
     }
 
     public String createToken(UUID reservationPublicId) {
-        try {
-            Mac mac = Mac.getInstance(HMAC_ALGORITHM);
-            mac.init(secretKey);
-            byte[] signature = mac.doFinal((TOKEN_PURPOSE + reservationPublicId).getBytes(StandardCharsets.UTF_8));
-            return Base64.getUrlEncoder().withoutPadding().encodeToString(signature);
-        } catch (GeneralSecurityException exception) {
-            throw new IllegalStateException("Failed to create QR token.", exception);
-        }
+        byte[] signature = sign(TOKEN_PURPOSE + reservationPublicId);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(signature);
     }
 
     public String hash(String token) {
@@ -57,6 +52,16 @@ public class QrTokenProvider {
             hash(token).getBytes(StandardCharsets.US_ASCII),
             tokenHash.getBytes(StandardCharsets.US_ASCII)
         );
+    }
+
+    private byte[] sign(String message) {
+        try {
+            Mac mac = Mac.getInstance(HMAC_ALGORITHM);
+            mac.init(secretKey);
+            return mac.doFinal(message.getBytes(StandardCharsets.UTF_8));
+        } catch (GeneralSecurityException exception) {
+            throw new IllegalStateException("Failed to sign QR ticket value.", exception);
+        }
     }
 
     private String digest(byte[] value) {
