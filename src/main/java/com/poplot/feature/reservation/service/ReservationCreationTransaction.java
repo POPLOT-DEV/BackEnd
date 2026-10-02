@@ -1,13 +1,10 @@
 package com.poplot.feature.reservation.service;
 
-import com.poplot.feature.event.entity.Event;
-import com.poplot.feature.event.enums.EventStatus;
 import com.poplot.feature.reservation.dto.request.CreateReservationRequest;
 import com.poplot.feature.reservation.dto.response.CreateReservationResponse;
 import com.poplot.feature.reservation.entity.Reservation;
 import com.poplot.feature.reservation.entity.TimeSlot;
 import com.poplot.feature.reservation.enums.ReservationStatus;
-import com.poplot.feature.reservation.enums.TimeSlotStatus;
 import com.poplot.feature.reservation.exception.ReservationErrorCode;
 import com.poplot.feature.reservation.repository.ReservationRepository;
 import com.poplot.feature.reservation.repository.TimeSlotRepository;
@@ -35,6 +32,7 @@ class ReservationCreationTransaction {
     private final CurrentUserService currentUserService;
     private final TimeSlotRepository timeSlotRepository;
     private final ReservationRepository reservationRepository;
+    private final ReservationEligibilityPolicy reservationEligibilityPolicy;
 
     @Transactional(timeout = 3)
     public CreateReservationResponse create(CreateReservationRequest request) {
@@ -89,13 +87,7 @@ class ReservationCreationTransaction {
     }
 
     private void validateReservable(TimeSlot timeSlot, Instant now) {
-        Event event = timeSlot.getEvent();
-        boolean reservationPeriodOpen = !now.isBefore(event.getReservationOpenAt())
-            && now.isBefore(event.getReservationCloseAt());
-        boolean unavailable = event.getStatus() != EventStatus.RESERVATION_OPEN
-            || timeSlot.getStatus() != TimeSlotStatus.OPEN
-            || !reservationPeriodOpen;
-        if (unavailable) {
+        if (!reservationEligibilityPolicy.isReservable(timeSlot, now)) {
             throw new GeneralException(ReservationErrorCode.UNAVAILABLE_TIME_SLOT);
         }
     }

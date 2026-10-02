@@ -55,8 +55,8 @@ public class Waitlist extends BaseTimeEntity {
     @Column(name = "accepted_at")
     private Instant acceptedAt;
 
-    @Column(name = "canceled_at")
-    private Instant canceledAt;
+    @Column(name = "declined_at")
+    private Instant declinedAt;
 
     @Column(name = "public_id", nullable = false, updatable = false)
     private UUID publicId;
@@ -72,5 +72,37 @@ public class Waitlist extends BaseTimeEntity {
         this.partySize = partySize;
         this.status = WaitlistStatus.WAITING;
         this.publicId = UUID.randomUUID();
+    }
+
+    public void offer(Instant now, Instant expiresAt) {
+        if (status != WaitlistStatus.WAITING) {
+            throw new IllegalStateException("Only a waiting entry can be offered.");
+        }
+        status = WaitlistStatus.OFFERED;
+        offeredAt = now;
+        offerExpiresAt = expiresAt;
+    }
+
+    public void accept(Instant now) {
+        if (status != WaitlistStatus.OFFERED) {
+            throw new IllegalStateException("Only an offered entry can be accepted.");
+        }
+        status = WaitlistStatus.ACCEPTED;
+        acceptedAt = now;
+    }
+
+    public void decline(Instant now) {
+        if (status != WaitlistStatus.OFFERED) {
+            throw new IllegalStateException("Only an offered entry can be declined.");
+        }
+        status = WaitlistStatus.DECLINED;
+        declinedAt = now;
+    }
+
+    public void expire() {
+        if (status != WaitlistStatus.OFFERED) {
+            throw new IllegalStateException("Only an offered entry can expire.");
+        }
+        status = WaitlistStatus.EXPIRED;
     }
 }

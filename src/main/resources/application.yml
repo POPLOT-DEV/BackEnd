@@ -19,6 +19,10 @@ jwt:
 qr-ticket:
   secret: ${QR_TICKET_SECRET:${jwt.secret}}
 
+waitlist:
+  offer-duration: ${WAITLIST_OFFER_DURATION:10m}
+  expiration-scan-delay: ${WAITLIST_EXPIRATION_SCAN_DELAY:1m}
+
 oauth:
   kakao:
     enabled: ${KAKAO_OAUTH_ENABLED:false}

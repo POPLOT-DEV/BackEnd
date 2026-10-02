@@ -5,10 +5,13 @@ import com.poplot.feature.event.enums.EventStatus;
 import com.poplot.feature.reservation.entity.Reservation;
 import com.poplot.feature.reservation.entity.QrTicket;
 import com.poplot.feature.reservation.entity.TimeSlot;
+import com.poplot.feature.reservation.entity.Waitlist;
 import com.poplot.feature.reservation.enums.ReservationStatus;
+import com.poplot.feature.reservation.enums.WaitlistStatus;
 import com.poplot.feature.reservation.repository.QrTicketRepository;
 import com.poplot.feature.reservation.repository.ReservationRepository;
 import com.poplot.feature.reservation.repository.TimeSlotRepository;
+import com.poplot.feature.reservation.repository.WaitlistRepository;
 import com.poplot.feature.reservation.token.QrTokenProvider;
 import com.poplot.feature.store.entity.Store;
 import com.poplot.feature.user.entity.User;
@@ -61,6 +64,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @Sql(statements = {
     "DELETE FROM qr_ticket",
     "DELETE FROM reservation",
+    "DELETE FROM waitlist",
     "DELETE FROM time_slot",
     "DELETE FROM event",
     "DELETE FROM store",
@@ -83,6 +87,8 @@ class ReservationConcurrencyIntegrationTest {
     private QrTicketRepository qrTicketRepository;
     @Autowired
     private TimeSlotRepository timeSlotRepository;
+    @Autowired
+    private WaitlistRepository waitlistRepository;
     @Autowired
     private JwtProvider jwtProvider;
     @Autowired
@@ -202,6 +208,31 @@ class ReservationConcurrencyIntegrationTest {
         Reservation saved = reservationRepository.findById(reservation.getId()).orElseThrow();
         assertThat(saved.getStatus()).isEqualTo(ReservationStatus.CHECKED_IN);
         assertThat(saved.getCheckedInAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("two concurrent accept requests create one reservation from one offer")
+    void concurrentWaitlistAcceptanceCreatesOneReservation() throws Exception {
+        User user = userRepository.save(User.create("waitlist-user@example.com", "waitlist-user"));
+        TimeSlot timeSlot = persistTimeSlot(1);
+        Waitlist waitlist = transactionTemplate.execute(status -> {
+            Waitlist entry = new Waitlist(user, entityManager.find(TimeSlot.class, timeSlot.getId()), 1);
+            entry.offer(Instant.now(), Instant.now().plusSeconds(600));
+            entityManager.persist(entry);
+            entityManager.flush();
+            return entry;
+        });
+        Callable<Integer> acceptRequest = () -> mockMvc.perform(post("/waitlists/{publicId}/accept", waitlist.getPublicId())
+                .header("Authorization", bearerToken(user)))
+            .andReturn().getResponse().getStatus();
+
+        List<Integer> statuses = runConcurrently(List.of(acceptRequest, acceptRequest));
+
+        assertThat(statuses).containsExactlyInAnyOrder(200, 409);
+        assertThat(waitlistRepository.findById(waitlist.getId()).orElseThrow().getStatus())
+            .isEqualTo(WaitlistStatus.ACCEPTED);
+        assertThat(reservationRepository.findAll()).singleElement();
+        assertThat(timeSlotRepository.findById(timeSlot.getId()).orElseThrow().getReservedCount()).isEqualTo(1);
     }
 
     private List<Integer> runConcurrently(List<Callable<Integer>> requests) throws Exception {
