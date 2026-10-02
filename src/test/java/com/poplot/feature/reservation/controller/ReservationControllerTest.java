@@ -40,6 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Sql(statements = {
     "DELETE FROM qr_ticket",
     "DELETE FROM reservation",
+    "DELETE FROM waitlist",
     "DELETE FROM time_slot",
     "DELETE FROM event",
     "DELETE FROM store",

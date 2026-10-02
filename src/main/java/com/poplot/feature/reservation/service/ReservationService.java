@@ -33,6 +33,7 @@ public class ReservationService {
     private final ReservationRepository reservationRepository;
     private final TimeSlotRepository timeSlotRepository;
     private final CurrentUserService currentUserService;
+    private final WaitlistOfferCoordinator waitlistOfferCoordinator;
 
     public CreateReservationResponse create(CreateReservationRequest request) {
         try {
@@ -63,6 +64,7 @@ public class ReservationService {
         Instant now = Instant.now();
         reservation.cancel(now, calculateCancellationDeadline(reservation));
         lockedTimeSlot.release(reservation.getPartySize());
+        waitlistOfferCoordinator.offerNext(lockedTimeSlot, now);
         return ReservationStatusResponse.canceled(reservation);
     }
 

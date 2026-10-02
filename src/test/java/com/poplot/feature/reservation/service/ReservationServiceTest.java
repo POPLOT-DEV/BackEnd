@@ -28,7 +28,8 @@ class ReservationServiceTest {
             transaction,
             mock(ReservationRepository.class),
             mock(TimeSlotRepository.class),
-            mock(CurrentUserService.class)
+            mock(CurrentUserService.class),
+            mock(WaitlistOfferCoordinator.class)
         );
         CreateReservationRequest request = new CreateReservationRequest(UUID.randomUUID().toString(), 1);
         when(transaction.create(request)).thenThrow(new ObjectOptimisticLockingFailureException("TimeSlot", 1L));
@@ -46,7 +47,8 @@ class ReservationServiceTest {
             transaction,
             mock(ReservationRepository.class),
             mock(TimeSlotRepository.class),
-            mock(CurrentUserService.class)
+            mock(CurrentUserService.class),
+            mock(WaitlistOfferCoordinator.class)
         );
         CreateReservationRequest request = new CreateReservationRequest(UUID.randomUUID().toString(), 1);
         when(transaction.create(request)).thenThrow(new CannotAcquireLockException("lock timeout"));
@@ -64,7 +66,8 @@ class ReservationServiceTest {
             transaction,
             mock(ReservationRepository.class),
             mock(TimeSlotRepository.class),
-            mock(CurrentUserService.class)
+            mock(CurrentUserService.class),
+            mock(WaitlistOfferCoordinator.class)
         );
         CreateReservationRequest request = new CreateReservationRequest(UUID.randomUUID().toString(), 1);
         when(transaction.create(request)).thenThrow(new QueryTimeoutException("transaction timeout"));
