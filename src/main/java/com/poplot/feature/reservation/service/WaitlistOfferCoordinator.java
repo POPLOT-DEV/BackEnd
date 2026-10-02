@@ -14,19 +14,25 @@ import java.time.Instant;
 public class WaitlistOfferCoordinator {
     private final WaitlistRepository waitlistRepository;
     private final Duration offerDuration;
+    private final ReservationEligibilityPolicy reservationEligibilityPolicy;
 
     public WaitlistOfferCoordinator(
         WaitlistRepository waitlistRepository,
-        @Value("${waitlist.offer-duration}") Duration offerDuration
+        @Value("${waitlist.offer-duration}") Duration offerDuration,
+        ReservationEligibilityPolicy reservationEligibilityPolicy
     ) {
         if (offerDuration.isZero() || offerDuration.isNegative()) {
             throw new IllegalArgumentException("Waitlist offer duration must be positive.");
         }
         this.waitlistRepository = waitlistRepository;
         this.offerDuration = offerDuration;
+        this.reservationEligibilityPolicy = reservationEligibilityPolicy;
     }
 
     public void offerNext(TimeSlot timeSlot, Instant now) {
+        if (!reservationEligibilityPolicy.isReservable(timeSlot, now)) {
+            return;
+        }
         while (true) {
             var activeOffer = waitlistRepository.findFirstByTimeSlotIdAndStatusOrderByOfferedAtAscIdAsc(
                 timeSlot.getId(),
@@ -52,6 +58,12 @@ public class WaitlistOfferCoordinator {
                 WaitlistStatus.WAITING,
                 timeSlot.getRemainingCount()
             )
-            .ifPresent(waitlist -> waitlist.offer(now, now.plus(offerDuration)));
+            .ifPresent(waitlist -> waitlist.offer(now, calculateOfferExpiresAt(timeSlot, now)));
+    }
+
+    private Instant calculateOfferExpiresAt(TimeSlot timeSlot, Instant now) {
+        Instant offerExpiresAt = now.plus(offerDuration);
+        Instant reservationCloseAt = timeSlot.getEvent().getReservationCloseAt();
+        return offerExpiresAt.isAfter(reservationCloseAt) ? reservationCloseAt : offerExpiresAt;
     }
 }

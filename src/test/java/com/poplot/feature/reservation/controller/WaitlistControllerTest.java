@@ -169,6 +169,43 @@ class WaitlistControllerTest {
     }
 
     @Test
+    @DisplayName("acceptance after reservation closing is rejected without consuming capacity")
+    void rejectsAcceptanceAfterReservationClosing() throws Exception {
+        User waitingUser = saveUser("closed-acceptance@example.com");
+        TimeSlot timeSlot = persistSoldOutTimeSlot(2, List.of(1));
+        Waitlist offered = persistWaitlist(waitingUser, timeSlot, 1, WaitlistStatus.OFFERED, Instant.now().plusSeconds(600));
+        closeReservationPeriod(timeSlot);
+
+        mockMvc.perform(post("/waitlists/{publicId}/accept", offered.getPublicId())
+                .header("Authorization", bearerToken(waitingUser)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("WAITLIST_400_02"));
+
+        assertThat(timeSlotRepository.findById(timeSlot.getId()).orElseThrow().getReservedCount()).isEqualTo(1);
+        assertThat(reservationRepository.findAll()).isEmpty();
+        assertThat(waitlistRepository.findById(offered.getId()).orElseThrow().getStatus()).isEqualTo(WaitlistStatus.OFFERED);
+    }
+
+    @Test
+    @DisplayName("cancellation after reservation closing does not create a new offer")
+    void doesNotOfferAfterReservationClosing() throws Exception {
+        User reservationOwner = saveUser("closed-owner@example.com");
+        User waitingUser = saveUser("closed-waiting@example.com");
+        TimeSlot timeSlot = persistSoldOutTimeSlot(2, List.of());
+        Reservation canceledReservation = persistReservation(reservationOwner, timeSlot, 2);
+        register(waitingUser, timeSlot, 1);
+        closeReservationPeriod(timeSlot);
+
+        mockMvc.perform(post("/reservations/{publicId}/cancel", canceledReservation.getPublicId())
+                .header("Authorization", bearerToken(reservationOwner)))
+            .andExpect(status().isOk());
+
+        Waitlist waitlist = findWaitlist(waitingUser);
+        assertThat(waitlistRepository.findById(waitlist.getId()).orElseThrow().getStatus())
+            .isEqualTo(WaitlistStatus.WAITING);
+    }
+
+    @Test
     @DisplayName("offer selection skips an oversized party and decline advances to the next feasible entry")
     void selectsFeasibleCandidateAndAdvancesAfterDecline() throws Exception {
         User reservationOwner = saveUser("reservation-owner@example.com");
@@ -311,6 +348,18 @@ class WaitlistControllerTest {
             .filter(waitlist -> waitlist.getUser().getId().equals(user.getId()))
             .findFirst()
             .orElseThrow();
+    }
+
+    private void closeReservationPeriod(TimeSlot timeSlot) {
+        transactionTemplate.executeWithoutResult(status -> entityManager.createQuery("""
+                update Event event
+                set event.reservationCloseAt = :closedAt
+                where event.id = :eventId
+                """)
+            .setParameter("closedAt", Instant.now().minusSeconds(1))
+            .setParameter("eventId", timeSlot.getEvent().getId())
+            .executeUpdate());
+        entityManager.clear();
     }
 
     private User saveUser(String email) {

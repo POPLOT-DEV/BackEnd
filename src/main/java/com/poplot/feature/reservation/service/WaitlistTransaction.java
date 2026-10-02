@@ -1,7 +1,5 @@
 package com.poplot.feature.reservation.service;
 
-import com.poplot.feature.event.entity.Event;
-import com.poplot.feature.event.enums.EventStatus;
 import com.poplot.feature.reservation.dto.request.CreateWaitlistRequest;
 import com.poplot.feature.reservation.dto.response.AcceptWaitlistResponse;
 import com.poplot.feature.reservation.dto.response.CreateWaitlistResponse;
@@ -10,7 +8,6 @@ import com.poplot.feature.reservation.entity.Reservation;
 import com.poplot.feature.reservation.entity.TimeSlot;
 import com.poplot.feature.reservation.entity.Waitlist;
 import com.poplot.feature.reservation.enums.ReservationStatus;
-import com.poplot.feature.reservation.enums.TimeSlotStatus;
 import com.poplot.feature.reservation.enums.WaitlistStatus;
 import com.poplot.feature.reservation.exception.ReservationErrorCode;
 import com.poplot.feature.reservation.exception.WaitlistErrorCode;
@@ -47,6 +44,7 @@ class WaitlistTransaction {
     private final WaitlistRepository waitlistRepository;
     private final ReservationRepository reservationRepository;
     private final WaitlistOfferCoordinator offerCoordinator;
+    private final ReservationEligibilityPolicy reservationEligibilityPolicy;
 
     @Transactional(timeout = 3)
     public CreateWaitlistResponse register(String timeSlotPublicId, CreateWaitlistRequest request) {
@@ -80,6 +78,7 @@ class WaitlistTransaction {
             offerCoordinator.offerNext(locked.timeSlot(), now);
             return AcceptResult.failure(WaitlistErrorCode.OFFER_EXPIRED);
         }
+        validateReservable(locked.timeSlot(), now);
         if (waitlist.getPartySize() > locked.timeSlot().getRemainingCount()) {
             return AcceptResult.failure(WaitlistErrorCode.INSUFFICIENT_CAPACITY);
         }
@@ -183,18 +182,17 @@ class WaitlistTransaction {
     }
 
     private void validateWaitlistRegistration(TimeSlot timeSlot, int partySize, Instant now) {
-        Event event = timeSlot.getEvent();
-        boolean reservationPeriodOpen = !now.isBefore(event.getReservationOpenAt())
-            && now.isBefore(event.getReservationCloseAt());
-        boolean unavailable = event.getStatus() != EventStatus.RESERVATION_OPEN
-            || timeSlot.getStatus() != TimeSlotStatus.OPEN
-            || !reservationPeriodOpen
-            || partySize > timeSlot.getCapacity();
-        if (unavailable) {
+        if (!reservationEligibilityPolicy.isReservable(timeSlot, now) || partySize > timeSlot.getCapacity()) {
             throw new GeneralException(WaitlistErrorCode.UNAVAILABLE_TIME_SLOT);
         }
         if (timeSlot.getRemainingCount() > 0) {
             throw new GeneralException(WaitlistErrorCode.RESERVATION_AVAILABLE);
+        }
+    }
+
+    private void validateReservable(TimeSlot timeSlot, Instant now) {
+        if (!reservationEligibilityPolicy.isReservable(timeSlot, now)) {
+            throw new GeneralException(WaitlistErrorCode.UNAVAILABLE_TIME_SLOT);
         }
     }
 
