@@ -41,12 +41,15 @@ public class QrTicketService {
 
         String token = qrTokenProvider.createToken(reservation.getPublicId());
         String tokenHash = qrTokenProvider.hash(token);
+        String keyId = qrTokenProvider.getKeyId();
         Instant now = Instant.now();
         Instant expiresAt = calculateExpiresAt(reservation);
         QrTicket ticket = qrTicketRepository.findByReservationId(reservation.getId())
-            .orElseGet(() -> qrTicketRepository.save(new QrTicket(reservation, tokenHash, now, expiresAt)));
-        if (!ticket.getTokenHash().equals(tokenHash) || !Objects.equals(ticket.getExpiresAt(), expiresAt)) {
-            ticket.reissue(tokenHash, now, expiresAt);
+            .orElseGet(() -> qrTicketRepository.save(new QrTicket(reservation, tokenHash, keyId, now, expiresAt)));
+        if (!ticket.getTokenHash().equals(tokenHash)
+            || !keyId.equals(ticket.getKeyId())
+            || !Objects.equals(ticket.getExpiresAt(), expiresAt)) {
+            ticket.reissue(tokenHash, keyId, now, expiresAt);
         }
         return QrTicketResponse.of(reservation, token);
     }

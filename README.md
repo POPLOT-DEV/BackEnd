@@ -131,9 +131,14 @@ DB_PASSWORD=postgres
 JWT_SECRET=
 JWT_ACCESS_TOKEN_EXPIRATION=3600000
 JWT_REFRESH_TOKEN_EXPIRATION=1209600000
+
+# JWT와 다른 최소 32바이트 이상의 임의 문자열
+QR_TICKET_SECRET=
 ```
 
-`.env`는 Git에 포함하지 않습니다. `JWT_SECRET`에는 최소 32바이트 이상의 값을 권장합니다.
+`.env`는 Git에 포함하지 않습니다. `JWT_SECRET`과 `QR_TICKET_SECRET`에는 서로 다른 최소 32바이트 이상의 임의 값을 사용합니다.
+
+QR 비밀키를 교체하면 기존 키로 발급한 모든 QR 티켓은 즉시 무효화됩니다. 모든 애플리케이션 인스턴스에 새 값을 동시에 배포한 뒤 예약 소유자가 티켓을 다시 조회해 재발급받도록 안내해야 합니다. 롤백할 때는 애플리케이션과 `QR_TICKET_SECRET`을 함께 이전 값으로 되돌려야 하며, 서로 다른 키를 사용하는 인스턴스를 동시에 운영하지 않습니다. 현재 `STAFF`와 `ADMIN`은 모든 이벤트를 체크인할 수 있으며, 매장별 권한은 Staff-Store 소속 모델이 추가된 후 제한해야 합니다.
 
 ### 로컬 실행
 

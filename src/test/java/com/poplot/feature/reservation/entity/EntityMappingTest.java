@@ -51,7 +51,7 @@ class EntityMappingTest {
         Reservation reservation = new Reservation(user, slot, "R-2026-1", 2);
         entityManager.persist(reservation);
         entityManager.persist(new Waitlist(user, slot, 2));
-        entityManager.persist(new QrTicket(reservation, "ticket-hash", Instant.now()));
+        entityManager.persist(new QrTicket(reservation, "ticket-hash", "key-id", Instant.now()));
         entityManager.persist(new SocialAccount(user, SocialProvider.KAKAO, "provider-id", null));
         entityManager.persist(new AuthSession(user, "refresh-hash", Instant.now().plusSeconds(3600), UUID.randomUUID()));
         entityManager.flush();

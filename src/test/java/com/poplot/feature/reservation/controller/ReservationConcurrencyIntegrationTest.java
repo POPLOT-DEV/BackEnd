@@ -194,7 +194,12 @@ class ReservationConcurrencyIntegrationTest {
         Reservation reservation = persistConfirmedReservationForCurrentCheckIn(owner);
         String qrToken = qrTokenProvider.createToken(reservation.getPublicId());
         transactionTemplate.executeWithoutResult(status -> qrTicketRepository.save(
-            new QrTicket(reservationRepository.findById(reservation.getId()).orElseThrow(), qrTokenProvider.hash(qrToken), Instant.now())
+            new QrTicket(
+                reservationRepository.findById(reservation.getId()).orElseThrow(),
+                qrTokenProvider.hash(qrToken),
+                qrTokenProvider.getKeyId(),
+                Instant.now()
+            )
         ));
         Callable<Integer> checkInRequest = () -> mockMvc.perform(post("/staff/check-ins")
                 .header("Authorization", bearerToken(staff))

@@ -21,6 +21,9 @@ jwt:
   access-token-expiration: 3600000
   refresh-token-expiration: 1209600000
 
+qr-ticket:
+  secret: test-qr-ticket-secret-key-for-poplot-backend-1234567890
+
 oauth:
   kakao:
     enabled: true
