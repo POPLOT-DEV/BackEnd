@@ -36,6 +36,9 @@ public class QrTicket extends BaseCreatedTimeEntity {
     @Column(name = "token_hash", nullable = false, length = 255)
     private String tokenHash;
 
+    @Column(name = "key_id", length = 64)
+    private String keyId;
+
     @Column(name = "issued_at", nullable = false)
     private Instant issuedAt;
 
@@ -50,19 +53,21 @@ public class QrTicket extends BaseCreatedTimeEntity {
     @Column(name = "qr_ticket_id")
     private Long id;
 
-    public QrTicket(Reservation reservation, String tokenHash, Instant issuedAt) {
-        this(reservation, tokenHash, issuedAt, null);
+    public QrTicket(Reservation reservation, String tokenHash, String keyId, Instant issuedAt) {
+        this(reservation, tokenHash, keyId, issuedAt, null);
     }
 
-    public QrTicket(Reservation reservation, String tokenHash, Instant issuedAt, Instant expiresAt) {
+    public QrTicket(Reservation reservation, String tokenHash, String keyId, Instant issuedAt, Instant expiresAt) {
         this.reservation = reservation;
         this.tokenHash = tokenHash;
+        this.keyId = keyId;
         this.issuedAt = issuedAt;
         this.expiresAt = expiresAt;
     }
 
-    public void reissue(String tokenHash, Instant issuedAt, Instant expiresAt) {
+    public void reissue(String tokenHash, String keyId, Instant issuedAt, Instant expiresAt) {
         this.tokenHash = tokenHash;
+        this.keyId = keyId;
         this.issuedAt = issuedAt;
         this.expiresAt = expiresAt;
         this.revokedAt = null;

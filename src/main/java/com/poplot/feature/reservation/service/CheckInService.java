@@ -35,18 +35,29 @@ public class CheckInService {
     public CheckInResponse checkIn(CheckInRequest request) {
         String token = validateRequest(request);
         validateStaffRole();
-        QrTicket ticket = qrTicketRepository.findByTokenHash(qrTokenProvider.hash(token))
+        String tokenHash = qrTokenProvider.hash(token);
+        var target = qrTicketRepository.findCheckInTargetByTokenHash(tokenHash)
             .orElseThrow(() -> new GeneralException(CheckInErrorCode.INVALID_QR_TOKEN));
-        if (ticket.getRevokedAt() != null) {
-            throw new GeneralException(CheckInErrorCode.INVALID_QR_TOKEN);
-        }
-        Reservation reservation = reservationRepository.findForUpdateById(ticket.getReservation().getId())
+        Reservation reservation = reservationRepository.findForUpdateById(target.getReservationId())
             .orElseThrow(() -> new GeneralException(CheckInErrorCode.INVALID_QR_TOKEN));
+        QrTicket ticket = qrTicketRepository.findByReservationId(reservation.getId())
+            .orElseThrow(() -> new GeneralException(CheckInErrorCode.INVALID_QR_TOKEN));
+        validateCurrentTicket(ticket, target.getTicketId(), token);
         Instant now = Instant.now();
         validateReservationStatus(reservation);
         validateCheckInWindow(reservation, ticket, now);
         reservation.checkIn(now);
         return CheckInResponse.from(reservation);
+    }
+
+    private void validateCurrentTicket(QrTicket ticket, Long expectedTicketId, String token) {
+        boolean invalid = !ticket.getId().equals(expectedTicketId)
+            || !qrTokenProvider.matches(token, ticket.getTokenHash())
+            || !qrTokenProvider.getKeyId().equals(ticket.getKeyId())
+            || ticket.getRevokedAt() != null;
+        if (invalid) {
+            throw new GeneralException(CheckInErrorCode.INVALID_QR_TOKEN);
+        }
     }
 
     private void validateReservationStatus(Reservation reservation) {

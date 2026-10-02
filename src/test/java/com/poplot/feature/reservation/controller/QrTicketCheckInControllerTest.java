@@ -142,6 +142,41 @@ class QrTicketCheckInControllerTest {
     }
 
     @Test
+    @DisplayName("secret rotation invalidates an old ticket until the owner reissues it")
+    void secretRotationInvalidatesOldTicketUntilReissue() throws Exception {
+        User owner = saveUser("rotation-owner@example.com", UserRole.USER);
+        User staff = saveUser("rotation-staff@example.com", UserRole.STAFF);
+        Reservation reservation = persistReservation(owner, ReservationStatus.CONFIRMED, currentSlotStart(), 30, 30);
+        QrTokenProvider previousProvider = new QrTokenProvider("previous-qr-ticket-secret-key-123456789");
+        String previousToken = previousProvider.createToken(reservation.getPublicId());
+        transactionTemplate.executeWithoutResult(status -> entityManager.persist(new QrTicket(
+            reservationRepository.findById(reservation.getId()).orElseThrow(),
+            previousProvider.hash(previousToken),
+            previousProvider.getKeyId(),
+            Instant.now()
+        )));
+
+        mockMvc.perform(post("/staff/check-ins")
+                .header("Authorization", bearerToken(staff))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(checkInBody(previousToken)))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("CHECKIN_404_01"));
+
+        String currentToken = getTicketToken(owner, reservation);
+        QrTicket reissued = qrTicketRepository.findByReservationId(reservation.getId()).orElseThrow();
+        assertThat(reissued.getKeyId()).isEqualTo(qrTokenProvider.getKeyId());
+        assertThat(reissued.getTokenHash()).isEqualTo(qrTokenProvider.hash(currentToken));
+
+        mockMvc.perform(post("/staff/check-ins")
+                .header("Authorization", bearerToken(staff))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(checkInBody(currentToken)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.checkInStatus").value("CHECKED_IN"));
+    }
+
+    @Test
     @DisplayName("check-in validates role, token presence, and token authenticity")
     void validatesStaffAndQrToken() throws Exception {
         User user = saveUser("user@example.com", UserRole.USER);
@@ -205,7 +240,12 @@ class QrTicketCheckInControllerTest {
     private String persistTicketToken(Reservation reservation) {
         String token = qrTokenProvider.createToken(reservation.getPublicId());
         transactionTemplate.executeWithoutResult(status -> entityManager.persist(
-            new QrTicket(reservationRepository.findById(reservation.getId()).orElseThrow(), qrTokenProvider.hash(token), Instant.now())
+            new QrTicket(
+                reservationRepository.findById(reservation.getId()).orElseThrow(),
+                qrTokenProvider.hash(token),
+                qrTokenProvider.getKeyId(),
+                Instant.now()
+            )
         ));
         return token;
     }
