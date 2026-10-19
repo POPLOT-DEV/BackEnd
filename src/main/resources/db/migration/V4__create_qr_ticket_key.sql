@@ -14,4 +14,5 @@ ALTER TABLE qr_ticket
     ADD COLUMN revoked_reason VARCHAR(30);
 
 ALTER TABLE qr_ticket
-    ADD CONSTRAINT ck_qr_ticket_revoked_reason CHECK (revoked_reason IN ('KEY_ROTATED'));
+    ADD CONSTRAINT ck_qr_ticket_revoked_reason
+        CHECK (revoked_reason IS NULL OR (revoked_reason IN ('KEY_ROTATED') AND revoked_at IS NOT NULL));

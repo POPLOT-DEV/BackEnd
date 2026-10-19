@@ -138,7 +138,7 @@ QR_TICKET_SECRET=
 
 `.env`는 Git에 포함하지 않습니다. `JWT_SECRET`과 `QR_TICKET_SECRET`에는 서로 다른 최소 32바이트 이상의 임의 값을 사용합니다.
 
-QR 비밀키는 `qr_ticket_key` 테이블에 키 세대로 기록되며, 애플리케이션은 현재 설정된 키가 이 테이블에서 `ACTIVE`일 때만 QR 티켓을 발급하고 체크인을 처리합니다. 키가 `ACTIVE`가 아니면 티켓 조회와 체크인은 503(`RESERVATION_503_01`, `CHECKIN_503_01`)을 반환하고 `/actuator/health/readiness`는 `DOWN`이 됩니다. 처음 배포하거나 키를 교체할 때는 새 `QR_TICKET_SECRET`을 설정한 상태에서 아래 활성화 작업을 한 번 실행합니다. 이 작업은 한 트랜잭션 안에서 기존 `ACTIVE` 키를 `RETIRED`로 바꾸고 새 키를 `ACTIVE`로 등록한 뒤, 새 키로 발급되지 않은 티켓에 `revoked_at`과 `revoked_reason = KEY_ROTATED`를 기록하고 종료합니다. 이미 `ACTIVE`인 키로 다시 실행해도 안전하며, 한 번 `RETIRED`가 된 키로 실행하면 작업이 실패하고 키 상태는 바뀌지 않습니다.
+QR 비밀키는 `qr_ticket_key` 테이블에 키 세대로 기록되며, 애플리케이션은 현재 설정된 키가 이 테이블에서 `ACTIVE`일 때만 QR 티켓을 발급하고 체크인을 처리합니다. 키가 `ACTIVE`가 아니면 티켓 조회와 체크인은 503(`RESERVATION_503_01`, `CHECKIN_503_01`)을 반환하고 `/actuator/health/readiness`는 `DOWN`이 됩니다. 처음 배포하거나 키를 교체할 때는 새 `QR_TICKET_SECRET`을 설정한 상태에서 아래 활성화 작업을 한 번 실행합니다. 이 작업은 한 트랜잭션 안에서 기존 `ACTIVE` 키를 `RETIRED`로 바꾸고 새 키를 `ACTIVE`로 등록한 뒤, 새 키로 발급되지 않은 티켓에 `revoked_at`과 `revoked_reason = KEY_ROTATED`를 기록하고 종료합니다. 이미 `ACTIVE`인 키로 다시 실행해도 안전하며, 한 번 `RETIRED`가 된 키로 실행하면 작업이 실패하고 키 상태는 바뀌지 않습니다. 활성화 작업은 한 번에 하나만 실행합니다. 여러 작업이 동시에 실행되면 하나만 성공하고 나머지는 제약 위반으로 실패하며, 키 상태와 티켓은 손상되지 않습니다.
 
 ```bash
 java -jar poplot-backend.jar --spring.main.web-application-type=none --qr-ticket.key-activation.enabled=true
