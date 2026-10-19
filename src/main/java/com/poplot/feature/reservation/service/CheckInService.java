@@ -30,11 +30,15 @@ public class CheckInService {
     private final QrTicketRepository qrTicketRepository;
     private final ReservationRepository reservationRepository;
     private final QrTokenProvider qrTokenProvider;
+    private final QrTicketKeyService qrTicketKeyService;
 
     @Transactional(timeout = 3)
     public CheckInResponse checkIn(CheckInRequest request) {
         String token = validateRequest(request);
         validateStaffRole();
+        if (!qrTicketKeyService.lockCurrentKeyIfActive()) {
+            throw new GeneralException(CheckInErrorCode.TICKET_KEY_UNAVAILABLE);
+        }
         String tokenHash = qrTokenProvider.hash(token);
         var target = qrTicketRepository.findCheckInTargetByTokenHash(tokenHash)
             .orElseThrow(() -> new GeneralException(CheckInErrorCode.INVALID_QR_TOKEN));
@@ -54,7 +58,7 @@ public class CheckInService {
         boolean invalid = !ticket.getId().equals(expectedTicketId)
             || !qrTokenProvider.matches(token, ticket.getTokenHash())
             || !qrTokenProvider.getKeyId().equals(ticket.getKeyId())
-            || ticket.getRevokedAt() != null;
+            || ticket.isRevoked();
         if (invalid) {
             throw new GeneralException(CheckInErrorCode.INVALID_QR_TOKEN);
         }

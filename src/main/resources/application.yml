@@ -19,6 +19,15 @@ jwt:
 qr-ticket:
   secret: ${QR_TICKET_SECRET}
 
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,qrTicketKey
+
 waitlist:
   offer-duration: ${WAITLIST_OFFER_DURATION:10m}
   expiration-scan-delay: ${WAITLIST_EXPIRATION_SCAN_DELAY:1m}

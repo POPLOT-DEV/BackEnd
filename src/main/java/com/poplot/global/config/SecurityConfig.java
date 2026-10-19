@@ -4,6 +4,7 @@ import com.poplot.global.security.jwt.JwtAccessDeniedHandler;
 import com.poplot.global.security.jwt.JwtAuthenticationEntryPoint;
 import com.poplot.global.security.jwt.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -12,6 +13,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @RequiredArgsConstructor
 public class SecurityConfig {
     private static final String[] PUBLIC_ENDPOINTS = {
@@ -19,6 +21,8 @@ public class SecurityConfig {
         "/swagger-ui.html",
         "/v3/api-docs/**",
         "/actuator/health",
+        "/actuator/health/liveness",
+        "/actuator/health/readiness",
         "/auth/oauth/**",
         "/auth/refresh",
         "/dev/auth/token",

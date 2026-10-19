@@ -12,6 +12,7 @@ import com.poplot.feature.reservation.repository.QrTicketRepository;
 import com.poplot.feature.reservation.repository.ReservationRepository;
 import com.poplot.feature.reservation.repository.TimeSlotRepository;
 import com.poplot.feature.reservation.repository.WaitlistRepository;
+import com.poplot.feature.reservation.service.QrTicketKeyService;
 import com.poplot.feature.reservation.token.QrTokenProvider;
 import com.poplot.feature.store.entity.Store;
 import com.poplot.feature.user.entity.User;
@@ -20,6 +21,7 @@ import com.poplot.feature.user.enums.UserStatus;
 import com.poplot.feature.user.repository.UserRepository;
 import com.poplot.global.security.jwt.JwtProvider;
 import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,6 +65,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @Testcontainers(disabledWithoutDocker = true)
 @Sql(statements = {
     "DELETE FROM qr_ticket",
+    "DELETE FROM qr_ticket_key",
     "DELETE FROM reservation",
     "DELETE FROM waitlist",
     "DELETE FROM time_slot",
@@ -94,9 +97,16 @@ class ReservationConcurrencyIntegrationTest {
     @Autowired
     private QrTokenProvider qrTokenProvider;
     @Autowired
+    private QrTicketKeyService qrTicketKeyService;
+    @Autowired
     private TransactionTemplate transactionTemplate;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @BeforeEach
+    void activateQrTicketKey() {
+        qrTicketKeyService.activateCurrentKey();
+    }
 
     @Test
     @DisplayName("concurrent reservation requests never exceed time slot capacity")
