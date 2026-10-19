@@ -45,6 +45,11 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -98,8 +103,8 @@ class QrTicketKeyRotationIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    @DisplayName("restoring a retired key keeps its tickets rejected and cannot reactivate the key")
-    void retiredKeyRestorationKeepsTicketsRejected() throws Exception {
+    @DisplayName("instance still configured with a rotated-out key rejects its tickets and cannot reactivate the key")
+    void instanceWithRetiredKeyRejectsTicketsAndCannotReactivate() throws Exception {
         User owner = saveUser("owner@example.com", UserRole.USER);
         User staff = saveUser("staff@example.com", UserRole.STAFF);
         Reservation reservation = persistConfirmedReservation(owner);
@@ -179,12 +184,60 @@ class QrTicketKeyRotationIntegrationTest {
     }
 
     @Test
+    @DisplayName("ticket request waiting on an in-flight rotation is rejected after the rotation commits")
+    void ticketRequestDuringRotationIsRejected() throws Exception {
+        User owner = saveUser("owner@example.com", UserRole.USER);
+        Reservation reservation = persistConfirmedReservation(owner);
+        qrTicketKeyService.activateCurrentKey();
+        getTicketToken(owner, reservation);
+        QrTicketKeyService nextKeyService = new QrTicketKeyService(
+            qrTicketKeyRepository,
+            qrTicketRepository,
+            new QrTokenProvider("next-qr-ticket-secret-key-for-poplot-123456789")
+        );
+        CountDownLatch rotationApplied = new CountDownLatch(1);
+        CountDownLatch releaseRotation = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<Integer> rotation = executor.submit(() -> transactionTemplate.execute(status -> {
+                int revokedCount = nextKeyService.activateCurrentKey();
+                rotationApplied.countDown();
+                awaitQuietly(releaseRotation);
+                return revokedCount;
+            }));
+            assertThat(rotationApplied.await(10, TimeUnit.SECONDS)).isTrue();
+
+            Future<Integer> ticketRequest = executor.submit(() -> mockMvc.perform(
+                    get("/reservations/{publicId}/ticket", reservation.getPublicId())
+                        .header("Authorization", bearerToken(owner)))
+                .andReturn().getResponse().getStatus());
+            assertThat(waitUntilLockWaiterExists()).isTrue();
+            assertThat(ticketRequest.isDone()).isFalse();
+            releaseRotation.countDown();
+
+            assertThat(rotation.get(10, TimeUnit.SECONDS)).isEqualTo(1);
+            assertThat(ticketRequest.get(10, TimeUnit.SECONDS)).isEqualTo(503);
+        } finally {
+            releaseRotation.countDown();
+            executor.shutdownNow();
+        }
+        QrTicket ticket = qrTicketRepository.findByReservationId(reservation.getId()).orElseThrow();
+        assertThat(ticket.getKeyId()).isEqualTo(qrTokenProvider.getKeyId());
+        assertThat(ticket.getRevokedAt()).isNotNull();
+        assertThat(ticket.getRevokedReason()).isEqualTo(QrTicketRevocationReason.KEY_ROTATED);
+    }
+
+    @Test
     @DisplayName("ticket revoked for a reason other than key rotation is not reissued")
     void ticketRevokedForOtherReasonIsNotReissued() throws Exception {
         User owner = saveUser("owner@example.com", UserRole.USER);
         Reservation reservation = persistConfirmedReservation(owner);
         qrTicketKeyService.activateCurrentKey();
         getTicketToken(owner, reservation);
+        assertThatThrownBy(() -> jdbcTemplate.update(
+            "UPDATE qr_ticket SET revoked_reason = 'KEY_ROTATED' WHERE reservation_id = ?",
+            reservation.getId()
+        )).isInstanceOf(DataIntegrityViolationException.class);
         jdbcTemplate.update("UPDATE qr_ticket SET revoked_at = now() WHERE reservation_id = ?", reservation.getId());
 
         mockMvc.perform(get("/reservations/{publicId}/ticket", reservation.getPublicId())
@@ -213,6 +266,28 @@ class QrTicketKeyRotationIntegrationTest {
     private int activateWith(QrTokenProvider provider) {
         QrTicketKeyService service = new QrTicketKeyService(qrTicketKeyRepository, qrTicketRepository, provider);
         return transactionTemplate.execute(status -> service.activateCurrentKey());
+    }
+
+    private boolean waitUntilLockWaiterExists() throws InterruptedException {
+        for (int attempt = 0; attempt < 40; attempt++) {
+            Integer waiters = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND datname = current_database()",
+                Integer.class
+            );
+            if (waiters != null && waiters > 0) {
+                return true;
+            }
+            Thread.sleep(50);
+        }
+        return false;
+    }
+
+    private void awaitQuietly(CountDownLatch latch) {
+        try {
+            latch.await(10, TimeUnit.SECONDS);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private String getTicketToken(User owner, Reservation reservation) throws Exception {
