@@ -138,7 +138,13 @@ QR_TICKET_SECRET=
 
 `.env`는 Git에 포함하지 않습니다. `JWT_SECRET`과 `QR_TICKET_SECRET`에는 서로 다른 최소 32바이트 이상의 임의 값을 사용합니다.
 
-QR 비밀키를 교체하면 기존 키로 발급한 모든 QR 티켓은 즉시 무효화됩니다. 모든 애플리케이션 인스턴스에 새 값을 동시에 배포한 뒤 예약 소유자가 티켓을 다시 조회해 재발급받도록 안내해야 합니다. 서로 다른 키를 사용하는 인스턴스를 동시에 운영하지 않습니다. 롤백할 때는 애플리케이션만 이전 버전으로 되돌리고 `QR_TICKET_SECRET`은 현재 값을 유지합니다. 교체로 퇴역한 키를 다시 설정하면 재발급되지 않은 기존 티켓이 다시 유효해지므로, 한 번 퇴역한 키는 재사용하지 않습니다. `key_id` 검증이 없는 버전으로 되돌려야 한다면 배포 전에 현재 키로 발급되지 않은 티켓(`key_id`가 NULL이거나 현재 키로 재발급된 티켓의 `key_id`와 다른 행)의 `revoked_at`을 먼저 설정합니다. 현재 `STAFF`와 `ADMIN`은 모든 이벤트를 체크인할 수 있으며, 매장별 권한은 Staff-Store 소속 모델이 추가된 후 제한해야 합니다.
+QR 비밀키는 `qr_ticket_key` 테이블에 키 세대로 기록되며, 애플리케이션은 현재 설정된 키가 이 테이블에서 `ACTIVE`일 때만 QR 티켓을 발급하고 체크인을 처리합니다. 키가 `ACTIVE`가 아니면 티켓 조회와 체크인은 503(`RESERVATION_503_01`, `CHECKIN_503_01`)을 반환하고 `/actuator/health/readiness`는 `DOWN`이 됩니다. 처음 배포하거나 키를 교체할 때는 새 `QR_TICKET_SECRET`을 설정한 상태에서 아래 활성화 작업을 한 번 실행합니다. 이 작업은 한 트랜잭션 안에서 기존 `ACTIVE` 키를 `RETIRED`로 바꾸고 새 키를 `ACTIVE`로 등록한 뒤, 새 키로 발급되지 않은 티켓에 `revoked_at`과 `revoked_reason = KEY_ROTATED`를 기록하고 종료합니다. 이미 `ACTIVE`인 키로 다시 실행해도 안전하며, 한 번 `RETIRED`가 된 키로 실행하면 작업이 실패하고 키 상태는 바뀌지 않습니다.
+
+```bash
+java -jar poplot-backend.jar --spring.main.web-application-type=none --qr-ticket.key-activation.enabled=true
+```
+
+키 교체는 새 키를 가진 인스턴스를 먼저 배포하고(readiness `DOWN` 상태로 트래픽을 받지 않음), 활성화 작업을 실행한 뒤, readiness가 `DOWN`으로 바뀐 기존 인스턴스를 drain하는 순서로 진행합니다. 활성화 직후부터 기존 인스턴스가 빠질 때까지 그 인스턴스로 들어온 QR 요청은 503을 반환합니다. 기존 티켓은 예약 소유자가 티켓을 다시 조회하면 새 키로 재발급되고 무효화가 해제되며, `KEY_ROTATED`가 아닌 사유로 무효화된 티켓은 재발급하지 않습니다. 롤백할 때는 애플리케이션만 이전 버전으로 되돌리고 `QR_TICKET_SECRET`은 현재 값을 유지합니다. 퇴역 키로 발급된 티켓은 DB에 무효화가 기록되어 있어 이전 버전에서도 거부되지만, 키 세대 검증이 없는 이전 버전에 퇴역 키까지 함께 설정하면 그 버전은 퇴역 키로 새 티켓을 발급할 수 있으므로 한 번 퇴역한 키는 재사용하지 않습니다. 현재 `STAFF`와 `ADMIN`은 모든 이벤트를 체크인할 수 있으며, 매장별 권한은 Staff-Store 소속 모델이 추가된 후 제한해야 합니다.
 
 ### 로컬 실행
 
@@ -158,6 +164,12 @@ Windows PowerShell:
 
 ```powershell
 .\gradlew.bat bootRun
+```
+
+QR 티켓 기능을 사용하려면 처음 한 번 현재 `QR_TICKET_SECRET`을 활성화해야 합니다. `QR_TICKET_SECRET`을 바꾼 경우에도 다시 실행합니다.
+
+```bash
+./gradlew bootRun --args='--spring.main.web-application-type=none --qr-ticket.key-activation.enabled=true'
 ```
 
 로컬 서버의 기본 주소는 `http://localhost:8080`입니다.
