@@ -1,8 +1,11 @@
 package com.poplot.feature.reservation.entity;
 
+import com.poplot.feature.reservation.enums.QrTicketRevocationReason;
 import com.poplot.global.common.entity.BaseCreatedTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -48,6 +51,10 @@ public class QrTicket extends BaseCreatedTimeEntity {
     @Column(name = "revoked_at")
     private Instant revokedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "revoked_reason", length = 30)
+    private QrTicketRevocationReason revokedReason;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "qr_ticket_id")
@@ -71,5 +78,14 @@ public class QrTicket extends BaseCreatedTimeEntity {
         this.issuedAt = issuedAt;
         this.expiresAt = expiresAt;
         this.revokedAt = null;
+        this.revokedReason = null;
+    }
+
+    public boolean isRevoked() {
+        return revokedAt != null;
+    }
+
+    public boolean isReissuable() {
+        return !isRevoked() || revokedReason == QrTicketRevocationReason.KEY_ROTATED;
     }
 }

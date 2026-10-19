@@ -20,7 +20,8 @@ public enum ReservationErrorCode implements BaseErrorCode {
     CONFIRMATION_EXPIRED(HttpStatus.CONFLICT, "RESERVATION_409_03", "예약 확정 가능 시간이 만료되었습니다."),
     INVALID_CONFIRM_STATUS(HttpStatus.CONFLICT, "RESERVATION_409_04", "확정할 수 없는 예약 상태입니다."),
     INVALID_CANCEL_STATUS(HttpStatus.CONFLICT, "RESERVATION_409_05", "취소할 수 없는 예약 상태입니다."),
-    CANCELLATION_EXPIRED(HttpStatus.CONFLICT, "RESERVATION_409_06", "예약 취소 가능 시간이 지났습니다.");
+    CANCELLATION_EXPIRED(HttpStatus.CONFLICT, "RESERVATION_409_06", "예약 취소 가능 시간이 지났습니다."),
+    TICKET_KEY_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "RESERVATION_503_01", "QR 티켓을 일시적으로 발급할 수 없습니다. 잠시 후 다시 시도해 주세요.");
 
     private final HttpStatus httpStatus;
     private final String code;
